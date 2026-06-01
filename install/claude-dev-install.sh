@@ -266,6 +266,5 @@ else
   echo -e "  ${INFO} Code Server: ${BOLD}https://${SERVER_IP}:8443${CL}"
   echo -e "  ${INFO} Password:    ${BOLD}${CS_PASSWORD}${CL}"
   echo -e "  ${INFO} Claude Code: ${BOLD}claude${CL} (run in terminal)\n"
-  echo -e "  ${YW}Note: Set your API key before using Claude:${CL}"
-  echo -e "  ${BOLD}export ANTHROPIC_API_KEY='sk-ant-...'${CL}\n"
+  echo -e "  ${YW}Note: Run ${BOLD}claude${YW} and follow the login link to authenticate.${CL}\n"
 fi

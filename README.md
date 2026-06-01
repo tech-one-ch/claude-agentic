@@ -64,24 +64,18 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
 
 ## First use
 
-1. **Set your API key** (once, inside the container/VM):
-   ```bash
-   export ANTHROPIC_API_KEY='sk-ant-...'
-   # Or add it permanently:
-   echo "export ANTHROPIC_API_KEY='sk-ant-...'" >> ~/.bashrc
-   ```
-
-2. **Open Code Server** in your browser: `https://<IP>:8443`
+1. **Open Code Server** in your browser: `https://<IP>:8443`
    - Password is shown in the terminal at the end of installation
    - Also visible at login: `cat /etc/motd`
 
-3. **Start Claude Code** from the Code Server terminal:
+2. **Start Claude Code** from the Code Server terminal:
    ```bash
    cd /root/projects
    claude
    ```
+   At first launch, Claude shows a login link — open it in your browser to authenticate with your Anthropic account (no API key needed).
 
-4. **Authenticate GitHub CLI** (for PR automation):
+3. **Authenticate GitHub CLI** (for PR automation):
    ```bash
    gh auth login
    ```
