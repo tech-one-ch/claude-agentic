@@ -6,13 +6,12 @@
 # Source: https://www.anthropic.com/claude-code
 #
 # Dual-mode installer:
-#   - Called by ct/claude-dev.sh inside a Proxmox LXC (FUNCTIONS_FILE_PATH is set)
+#   - Called by ct/claude-agentic.sh inside a Proxmox LXC (FUNCTIONS_FILE_PATH is set)
 #   - Can also run standalone on any existing Debian/Ubuntu system or VPS
 
 # ─── Mode detection ────────────────────────────────────────────────────────────
 
 if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
-  # Community-scripts context: functions injected by Proxmox host
   source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
   color
   verb_ip6
@@ -21,7 +20,6 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   network_check
   update_os
 else
-  # Standalone mode: define minimal compatible functions
   YW=$(printf '\033[33m')
   GN=$(printf '\033[1;92m')
   RD=$(printf '\033[01;31m')
@@ -38,16 +36,20 @@ else
   msg_error() { local m="$1"; echo -e "${BFR} ${CROSS} ${RD}${m}${CL}"; exit 1; }
   msg_warn()  { local m="$1"; echo -e " ${INFO} ${YW}${m}${CL}"; }
 
-  [[ $EUID -ne 0 ]] && msg_error "Run as root: sudo bash install/claude-dev-install.sh"
+  [[ $EUID -ne 0 ]] && msg_error "Run as root: sudo bash install/claude-agentic-install.sh"
   [[ ! -f /etc/os-release ]] && msg_error "Cannot detect OS"
-  # shellcheck source=/dev/null
   source /etc/os-release
   [[ "$ID" != "debian" && "$ID" != "ubuntu" ]] && msg_error "Requires Debian or Ubuntu (got: ${ID})"
 
-  STD=""  # Show full output in standalone mode
+  STD=""
 
-  echo -e "\n ${BOLD}${BL}Claude Dev — Standalone Installer${CL}"
-  echo -e " ${YW}OS: ${ID} ${VERSION_ID}${CL}\n"
+  LOG_FILE="/var/log/claude-agentic-install.log"
+  exec > >(tee -a "$LOG_FILE") 2>&1
+  echo "=== Install started: $(date) ==="
+
+  echo -e "\n ${BOLD}${BL}Claude Agentic — Standalone Installer${CL}"
+  echo -e " ${YW}OS: ${ID} ${VERSION_ID}${CL}"
+  echo -e " ${YW}Log: ${LOG_FILE}${CL}\n"
 
   msg_info "Updating system packages"
   apt-get update -qq
@@ -55,91 +57,107 @@ else
   msg_ok "System updated"
 fi
 
-APP="${APP:-Claude Dev}"
+APP="${APP:-Claude Agentic}"
 
-# ─── 1. Base dependencies ───────────────────────────────────────────────────────
+# ─── 1. Locale ──────────────────────────────────────────────────────────────────
+
+msg_info "Configuring locale"
+$STD apt-get install -y locales
+sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen
+$STD locale-gen en_US.UTF-8
+$STD update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+msg_ok "Locale configured (en_US.UTF-8)"
+
+# ─── 2. Base dependencies ────────────────────────────────────────────────────────
 
 msg_info "Installing base dependencies"
 $STD apt-get install -y \
-  curl wget git build-essential pkg-config \
-  ca-certificates gnupg lsb-release apt-transport-https \
-  software-properties-common \
+  curl wget git build-essential make cmake pkg-config autoconf automake libtool \
+  ca-certificates gnupg lsb-release apt-transport-https software-properties-common \
   libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev \
-  libsqlite3-dev libncursesw5-dev libgdbm-dev liblzma-dev libxml2-dev \
-  tmux htop nano vim jq unzip zip tar openssl \
-  ripgrep fd-find fzf \
-  postgresql-client sqlite3 redis-tools
+  libsqlite3-dev libncursesw5-dev libgdbm-dev liblzma-dev libxml2-dev libxslt-dev \
+  tmux screen htop nano vim jq yq unzip zip tar openssl \
+  ripgrep fd-find fzf bat \
+  net-tools iproute2 dnsutils openssh-server \
+  postgresql-client sqlite3 redis-tools \
+  cron logrotate
 msg_ok "Installed base dependencies"
 
-# bat (binary is batcat on Debian/Ubuntu, symlink to bat)
-msg_info "Installing bat"
-$STD apt-get install -y bat 2>/dev/null || $STD apt-get install -y batcat 2>/dev/null || true
-[[ ! -f /usr/local/bin/bat ]] && [[ -f /usr/bin/batcat ]] && ln -s /usr/bin/batcat /usr/local/bin/bat
-msg_ok "Installed bat"
+# fd and bat symlinks (Debian/Ubuntu ship them as fdfind / batcat)
+[[ ! -f /usr/local/bin/fd  ]] && [[ -f /usr/bin/fdfind  ]] && ln -s /usr/bin/fdfind  /usr/local/bin/fd
+[[ ! -f /usr/local/bin/bat ]] && [[ -f /usr/bin/batcat  ]] && ln -s /usr/bin/batcat  /usr/local/bin/bat
+[[ ! -f /usr/local/bin/bat ]] && [[ -f /usr/bin/bat     ]] && ln -s /usr/bin/bat     /usr/local/bin/bat
 
-# fd symlink (binary is fdfind on Debian/Ubuntu)
-[[ ! -f /usr/local/bin/fd ]] && [[ -f /usr/bin/fdfind ]] && ln -s /usr/bin/fdfind /usr/local/bin/fd
-
-# ─── 2. Node.js 22 LTS ──────────────────────────────────────────────────────────
+# ─── 3. Node.js 22 LTS ───────────────────────────────────────────────────────────
 
 msg_info "Installing Node.js 22 LTS"
 $STD curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 $STD apt-get install -y nodejs
 msg_ok "Installed Node.js $(node --version)"
 
-# ─── 3. Python 3 + tools ────────────────────────────────────────────────────────
+msg_info "Installing global Node.js tools"
+$STD npm install -g typescript ts-node eslint prettier
+msg_ok "Installed TypeScript, ts-node, ESLint, Prettier"
+
+# ─── 4. Python 3 ─────────────────────────────────────────────────────────────────
 
 msg_info "Installing Python tools"
 $STD apt-get install -y python3 python3-pip python3-venv python3-dev
-$STD pip3 install --quiet pipx uv 2>/dev/null || true
+$STD pip3 install --quiet --break-system-packages pipx uv 2>/dev/null || \
+  $STD pip3 install --quiet pipx uv 2>/dev/null || true
 msg_ok "Installed Python $(python3 --version | cut -d' ' -f2)"
 
-# ─── 4. Go (latest) ─────────────────────────────────────────────────────────────
+# ─── 5. Go (latest) ──────────────────────────────────────────────────────────────
 
 msg_info "Installing Go"
-GO_VERSION=$(curl -fsS "https://go.dev/dl/?mode=json" | grep -o '"version":"go[^"]*"' | head -1 | cut -d'"' -f4)
+GO_VERSION=$(curl -fsSL "https://go.dev/VERSION?m=text" | head -1)
 if [[ -n "$GO_VERSION" ]]; then
   $STD curl -fsSL "https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
   rm -rf /usr/local/go
   $STD tar -C /usr/local -xzf /tmp/go.tar.gz
   rm -f /tmp/go.tar.gz
-  [[ ! -f /usr/local/bin/go ]] && ln -s /usr/local/go/bin/go /usr/local/bin/go
-  [[ ! -f /usr/local/bin/gofmt ]] && ln -s /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+  cat > /etc/profile.d/go.sh <<'EOF'
+export PATH=$PATH:/usr/local/go/bin
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+EOF
   msg_ok "Installed Go ${GO_VERSION}"
 else
-  msg_warn "Could not determine latest Go version, skipping"
+  msg_warn "Could not fetch Go version, skipping"
 fi
 
-# ─── 5. Rust ────────────────────────────────────────────────────────────────────
+# ─── 6. Rust ──────────────────────────────────────────────────────────────────────
 
 msg_info "Installing Rust"
-$STD curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --quiet
-export PATH="/root/.cargo/bin:$PATH"
-[[ ! -f /usr/local/bin/cargo ]] && ln -s /root/.cargo/bin/cargo /usr/local/bin/cargo 2>/dev/null || true
-[[ ! -f /usr/local/bin/rustc ]] && ln -s /root/.cargo/bin/rustc /usr/local/bin/rustc 2>/dev/null || true
+$STD curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
+[[ ! -f /usr/local/bin/cargo ]] && ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo 2>/dev/null || true
+[[ ! -f /usr/local/bin/rustc ]] && ln -sf "$HOME/.cargo/bin/rustc" /usr/local/bin/rustc 2>/dev/null || true
 msg_ok "Installed Rust $(rustc --version 2>/dev/null | cut -d' ' -f2 || echo 'latest')"
 
-# ─── 6. Docker + Docker Compose ─────────────────────────────────────────────────
+# ─── 7. Docker + Compose plugin ───────────────────────────────────────────────────
 
 msg_info "Installing Docker"
 $STD curl -fsSL https://get.docker.com | sh
 $STD systemctl enable --now docker
-$STD curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
-  -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-msg_ok "Installed Docker $(docker --version | cut -d' ' -f3 | tr -d ',')"
+$STD apt-get install -y docker-compose-plugin
+msg_ok "Installed Docker $(docker --version | cut -d' ' -f3 | tr -d ',') + Compose plugin"
 
-# Watchtower: auto-update Docker containers
-msg_info "Starting Watchtower (Docker auto-updater)"
-$STD docker run -d \
-  --name watchtower \
-  --restart unless-stopped \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  containrrr/watchtower \
-  --cleanup --interval 86400
-msg_ok "Watchtower running"
+# ─── 8. GitHub CLI ────────────────────────────────────────────────────────────────
 
-# ─── 7. code-server (VS Code in browser) ─────────────────────────────────────────
+msg_info "Installing GitHub CLI"
+$STD curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+  https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
+$STD apt-get update
+$STD apt-get install -y gh
+msg_ok "Installed GitHub CLI $(gh --version | head -1 | cut -d' ' -f3)"
+
+# ─── 9. code-server ───────────────────────────────────────────────────────────────
 
 msg_info "Installing code-server"
 $STD curl -fsSL https://code-server.dev/install.sh | sh
@@ -156,106 +174,259 @@ EOF
 systemctl enable --now code-server@root &>/dev/null || true
 msg_ok "Installed code-server (port 8443)"
 
-# ─── 8. Claude Code ─────────────────────────────────────────────────────────────
+# ─── 10. Claude Code ──────────────────────────────────────────────────────────────
 
-msg_info "Installing Claude Code"
-$STD npm install -g @anthropic-ai/claude-code
+msg_info "Installing Claude Code (native installer)"
+$STD curl -fsSL https://claude.ai/install.sh | bash
+# Ensure claude is on PATH
+for p in "$HOME/.local/bin/claude" "$HOME/.claude/bin/claude"; do
+  [[ -f "$p" ]] && ln -sf "$p" /usr/local/bin/claude 2>/dev/null && break
+done
 msg_ok "Installed Claude Code $(claude --version 2>/dev/null || echo 'latest')"
 
-msg_info "Configuring Claude Code permissions"
+msg_info "Configuring Claude Code"
 mkdir -p /root/.claude
 cat > /root/.claude/settings.json <<'EOF'
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(*)",
       "Read(*)",
       "Write(*)",
       "Edit(*)",
+      "MultiEdit(*)",
       "WebFetch(*)",
       "WebSearch(*)",
       "Task(*)",
       "Agent(*)",
       "TodoWrite(*)",
-      "TodoRead(*)"
+      "TodoRead(*)",
+      "Grep(*)",
+      "Glob(*)",
+      "LS(*)",
+      "mcp__*"
     ],
     "deny": []
   },
-  "enabledFeatures": {
-    "agentTeams": true
-  },
   "env": {
-    "ANTHROPIC_MODEL": "claude-sonnet-4-6"
-  }
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
+  },
+  "alwaysThinkingEnabled": true,
+  "disableRemoteControl": false
 }
 EOF
 msg_ok "Configured Claude Code (all permissions pre-approved)"
 
-# ─── 9. GitHub CLI ───────────────────────────────────────────────────────────────
+# ─── 11. Workspace & CLAUDE.md ────────────────────────────────────────────────────
 
-msg_info "Installing GitHub CLI (gh)"
-$STD curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-  | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
-  https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
-$STD apt-get update
-$STD apt-get install -y gh
-msg_ok "Installed GitHub CLI $(gh --version | head -1 | cut -d' ' -f3)"
+msg_info "Setting up workspace"
+mkdir -p /project
+cat > /project/CLAUDE.md <<'EOF'
+# Claude Agentic Workspace
 
-# ─── 10. Shell environment ──────────────────────────────────────────────────────
+## Environment
+- **OS**: Ubuntu 24.04 (LXC on Proxmox or standalone VM/VPS)
+- **Working directory**: /project
+- **User**: root
+
+## Available tools
+- **Languages**: Node.js 22 LTS, TypeScript, Python 3, Go (latest), Rust (latest)
+- **Package managers**: npm, pip (--break-system-packages), cargo, go install
+- **Docker**: Docker Engine + Compose plugin (`docker compose`)
+- **GitHub**: `gh` CLI pre-installed — use it for PRs, issues, releases
+- **Search**: ripgrep (`rg`), fd, fzf, bat, jq, yq
+- **Databases**: PostgreSQL client, Redis CLI, SQLite3
+- **Editor**: code-server on port 8443 (VS Code in browser)
+
+## Permissions
+All tools pre-approved — no prompts for Bash, Read, Write, Edit, MultiEdit,
+WebFetch, WebSearch, Task, Agent, Grep, Glob, LS, MCP tools.
+
+## Agent teams
+Agent teams are enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+Use parallel subagents for complex tasks via the Task tool.
+
+## Git conventions
+- Default branch: main
+- Always use `gh pr create` to open PRs
+- Commit messages: `type: description` (feat, fix, refactor, docs, chore)
+
+## Docker
+- Compose files: `/docker/<service>/docker-compose.yml`
+- All containers need `security_opt: [apparmor=unconfined]` in this LXC
+
+## Recommended plugins (install inside Claude Code)
+
+### Superpowers — structured development methodology
+Enforces: brainstorm → design → plan → implement (subagents) → TDD → review
+```
+/plugin marketplace add obra/superpowers-marketplace
+/plugin install superpowers@superpowers-marketplace
+```
+
+### Other useful plugins (from official marketplace)
+```
+/plugin install code-review@claude-plugins-official
+/plugin install commit-commands@claude-plugins-official
+/plugin install security-guidance@claude-plugins-official
+```
+EOF
+msg_ok "Workspace ready at /project"
+
+# ─── 12. Git global defaults ──────────────────────────────────────────────────────
+
+msg_info "Configuring Git defaults"
+git config --global init.defaultBranch main
+git config --global core.editor nano
+git config --global pull.rebase false
+git config --global core.autocrlf false
+msg_ok "Git defaults configured"
+
+# ─── 13. Shell environment ────────────────────────────────────────────────────────
 
 msg_info "Configuring shell environment"
 cat >> /root/.bashrc <<'EOF'
 
-# Claude Dev environment
-export PATH="/root/.cargo/bin:/usr/local/go/bin:$PATH"
-export GOPATH="/root/go"
+# ── Claude Agentic ──────────────────────────────────────────────
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+export EDITOR=nano
+export PATH="$HOME/.local/bin:$HOME/.claude/bin:$HOME/.cargo/bin:/usr/local/go/bin:$PATH"
+export GOPATH="$HOME/go"
 export PATH="$GOPATH/bin:$PATH"
 
-# Aliases
-alias ll='ls -alF'
+alias ll='ls -lah --color=auto'
 alias la='ls -A'
 alias ..='cd ..'
+alias ...='cd ../..'
+alias gs='git status'
+alias gl='git log --oneline -20'
 alias dc='docker compose'
-alias k='kubectl'
+alias dps='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+
+# Start in /project by default
+[[ -d /project ]] && cd /project
 EOF
 msg_ok "Shell environment configured"
 
-# ─── 11. Scheduled updates ──────────────────────────────────────────────────────
+# ─── 14. SSH ──────────────────────────────────────────────────────────────────────
+
+msg_info "Configuring SSH"
+sed -i "s/^#*PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
+sed -i "s/^#*PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config
+$STD systemctl enable --now ssh
+msg_ok "SSH configured"
+
+# ─── 15. Update command ───────────────────────────────────────────────────────────
+
+msg_info "Installing 'update' command"
+cat > /usr/local/bin/update <<'EOF'
+#!/usr/bin/env bash
+# Claude Agentic — Update
+# Run this command inside the LXC or VM to update all components.
+
+# Refuse to run on the Proxmox host
+if [[ -d /etc/pve ]]; then
+  echo "This command must be run inside the LXC or VM, not on the Proxmox host." >&2
+  exit 1
+fi
+
+[[ $EUID -ne 0 ]] && exec sudo "$0" "$@"
+
+YW=$(printf '\033[33m')
+GN=$(printf '\033[1;92m')
+RD=$(printf '\033[01;31m')
+BOLD=$(printf '\033[1m')
+CL=$(printf '\033[m')
+BFR="\\r\\033[K"
+CM="${GN}✔${CL}"
+CROSS="${RD}✖${CL}"
+
+msg_info()  { local m="$1"; echo -ne " ⏳ ${YW}${m}...${CL}"; }
+msg_ok()    { local m="$1"; echo -e "${BFR} ${CM} ${GN}${m}${CL}"; }
+msg_error() { local m="$1"; echo -e "${BFR} ${CROSS} ${RD}${m}${CL}"; exit 1; }
+
+echo -e "\n ${BOLD}${YW}Claude Agentic — Update${CL}\n"
+
+msg_info "Updating system packages"
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+apt-get autoremove -y -qq
+msg_ok "System packages updated"
+
+msg_info "Updating Claude Code"
+curl -fsSL https://claude.ai/install.sh | bash
+for p in "$HOME/.local/bin/claude" "$HOME/.claude/bin/claude"; do
+  [[ -f "$p" ]] && ln -sf "$p" /usr/local/bin/claude 2>/dev/null && break
+done
+msg_ok "Claude Code updated ($(claude --version 2>/dev/null || echo 'latest'))"
+
+if command -v code-server &>/dev/null; then
+  msg_info "Updating code-server"
+  curl -fsSL https://code-server.dev/install.sh | sh
+  systemctl restart code-server@root 2>/dev/null || true
+  msg_ok "code-server updated"
+fi
+
+echo -e "\n ${CM} ${BOLD}${GN}All updates applied.${CL}\n"
+EOF
+chmod +x /usr/local/bin/update
+msg_ok "Installed 'update' command (/usr/local/bin/update)"
+
+# ─── 16. Scheduled updates (weekly cron) ─────────────────────────────────────────
 
 msg_info "Setting up weekly auto-update"
-cat > /etc/cron.weekly/claude-dev-update <<'CRON'
+cat > /etc/cron.weekly/claude-agentic-update <<'CRON'
 #!/usr/bin/env bash
-apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
-npm update -g @anthropic-ai/claude-code 2>/dev/null || true
+apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq && apt-get autoremove -y -qq
+curl -fsSL https://claude.ai/install.sh | bash 2>/dev/null || true
 curl -fsSL https://code-server.dev/install.sh | sh 2>/dev/null || true
 systemctl restart code-server@root 2>/dev/null || true
 CRON
-chmod +x /etc/cron.weekly/claude-dev-update
+chmod +x /etc/cron.weekly/claude-agentic-update
+
+cat > /etc/logrotate.d/claude-agentic <<'EOF'
+/var/log/claude-agentic-update.log {
+    monthly
+    rotate 3
+    compress
+    missingok
+    notifempty
+}
+EOF
 msg_ok "Weekly auto-update scheduled"
 
-# ─── 12. MOTD with credentials ──────────────────────────────────────────────────
+# ─── 16. Cleanup ──────────────────────────────────────────────────────────────────
+
+msg_info "Cleaning up"
+$STD apt-get autoremove -y
+$STD apt-get clean
+rm -rf /var/lib/apt/lists/*
+msg_ok "Cleaned up"
+
+# ─── 17. MOTD ─────────────────────────────────────────────────────────────────────
 
 msg_info "Writing login banner"
 SERVER_IP=$(hostname -I | awk '{print $1}')
 cat > /etc/motd <<EOF
 
   ╔═══════════════════════════════════════════════════════╗
-  ║              Claude Dev Environment                   ║
+  ║           Claude Agentic Environment                  ║
   ╠═══════════════════════════════════════════════════════╣
   ║  Code Server:  https://${SERVER_IP}:8443
   ║  Password:     ${CS_PASSWORD}
   ║                                                       ║
   ║  Start Claude: claude                                 ║
-  ║  Projects dir: /root/projects                         ║
+  ║  Workspace:    /project                               ║
+  ║  Plugins doc:  cat /project/CLAUDE.md                 ║
   ╚═══════════════════════════════════════════════════════╝
 
 EOF
-mkdir -p /root/projects
 msg_ok "Login banner configured"
 
-# ─── Done ────────────────────────────────────────────────────────────────────────
+# ─── Done ─────────────────────────────────────────────────────────────────────────
 
 if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   motd_ssh
@@ -263,8 +434,11 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   cleanup_lxc
 else
   echo -e "\n ${CM} ${BOLD}${GN}Installation complete!${CL}\n"
-  echo -e "  ${INFO} Code Server: ${BOLD}https://${SERVER_IP}:8443${CL}"
-  echo -e "  ${INFO} Password:    ${BOLD}${CS_PASSWORD}${CL}"
-  echo -e "  ${INFO} Claude Code: ${BOLD}claude${CL} (run in terminal)\n"
-  echo -e "  ${YW}Note: Run ${BOLD}claude${YW} and follow the login link to authenticate.${CL}\n"
+  echo -e "  ${INFO} Code Server : ${BOLD}https://${SERVER_IP}:8443${CL}"
+  echo -e "  ${INFO} Password    : ${BOLD}${CS_PASSWORD}${CL}"
+  echo -e "  ${INFO} Workspace   : ${BOLD}/project${CL}"
+  echo -e "  ${INFO} Claude Code : run ${BOLD}claude${CL} and follow the login link\n"
+  echo -e "  ${YW}Recommended first step in Claude Code:${CL}"
+  echo -e "  ${BOLD}/plugin marketplace add obra/superpowers-marketplace${CL}"
+  echo -e "  ${BOLD}/plugin install superpowers@superpowers-marketplace${CL}\n"
 fi

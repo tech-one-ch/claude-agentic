@@ -13,8 +13,9 @@ var_ram="${var_ram:-4096}"
 var_disk="${var_disk:-20}"
 var_os="${var_os:-ubuntu}"
 var_version="${var_version:-24.04}"
-var_unprivileged="${var_unprivileged:-0}"
+var_unprivileged="${var_unprivileged:-1}"
 var_nesting="${var_nesting:-1}"
+var_keyctl="${var_keyctl:-1}"
 
 header_info "$APP"
 variables
@@ -29,20 +30,11 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-
-  msg_info "Updating Claude Code"
-  $STD npm update -g @anthropic-ai/claude-code
-  msg_ok "Updated Claude Code ($(claude --version 2>/dev/null || echo 'latest'))"
-
-  msg_info "Updating code-server"
-  $STD curl -fsSL https://code-server.dev/install.sh | sh
-  $STD systemctl restart code-server@root
-  msg_ok "Updated code-server"
-
-  msg_info "Updating System Packages"
-  $STD apt-get update
-  $STD apt-get upgrade -y
-  msg_ok "Updated System Packages"
+  if [[ -x /usr/local/bin/update ]]; then
+    /usr/local/bin/update
+  else
+    msg_error "Update command not found. Re-run the installer to set it up."
+  fi
   exit
 }
 
