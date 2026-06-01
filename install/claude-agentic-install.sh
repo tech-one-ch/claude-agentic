@@ -43,8 +43,13 @@ else
 
   STD=""
 
+  LOG_FILE="/var/log/claude-agentic-install.log"
+  exec > >(tee -a "$LOG_FILE") 2>&1
+  echo "=== Install started: $(date) ==="
+
   echo -e "\n ${BOLD}${BL}Claude Agentic — Standalone Installer${CL}"
-  echo -e " ${YW}OS: ${ID} ${VERSION_ID}${CL}\n"
+  echo -e " ${YW}OS: ${ID} ${VERSION_ID}${CL}"
+  echo -e " ${YW}Log: ${LOG_FILE}${CL}\n"
 
   msg_info "Updating system packages"
   apt-get update -qq
@@ -314,7 +319,63 @@ sed -i "s/^#*PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd
 $STD systemctl enable --now ssh
 msg_ok "SSH configured"
 
-# ─── 15. Scheduled updates ────────────────────────────────────────────────────────
+# ─── 15. Update command ───────────────────────────────────────────────────────────
+
+msg_info "Installing 'update' command"
+cat > /usr/local/bin/update <<'EOF'
+#!/usr/bin/env bash
+# Claude Agentic — Update
+# Run this command inside the LXC or VM to update all components.
+
+# Refuse to run on the Proxmox host
+if [[ -d /etc/pve ]]; then
+  echo "This command must be run inside the LXC or VM, not on the Proxmox host." >&2
+  exit 1
+fi
+
+[[ $EUID -ne 0 ]] && exec sudo "$0" "$@"
+
+YW=$(printf '\033[33m')
+GN=$(printf '\033[1;92m')
+RD=$(printf '\033[01;31m')
+BOLD=$(printf '\033[1m')
+CL=$(printf '\033[m')
+BFR="\\r\\033[K"
+CM="${GN}✔${CL}"
+CROSS="${RD}✖${CL}"
+
+msg_info()  { local m="$1"; echo -ne " ⏳ ${YW}${m}...${CL}"; }
+msg_ok()    { local m="$1"; echo -e "${BFR} ${CM} ${GN}${m}${CL}"; }
+msg_error() { local m="$1"; echo -e "${BFR} ${CROSS} ${RD}${m}${CL}"; exit 1; }
+
+echo -e "\n ${BOLD}${YW}Claude Agentic — Update${CL}\n"
+
+msg_info "Updating system packages"
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+apt-get autoremove -y -qq
+msg_ok "System packages updated"
+
+msg_info "Updating Claude Code"
+curl -fsSL https://claude.ai/install.sh | bash
+for p in "$HOME/.local/bin/claude" "$HOME/.claude/bin/claude"; do
+  [[ -f "$p" ]] && ln -sf "$p" /usr/local/bin/claude 2>/dev/null && break
+done
+msg_ok "Claude Code updated ($(claude --version 2>/dev/null || echo 'latest'))"
+
+if command -v code-server &>/dev/null; then
+  msg_info "Updating code-server"
+  curl -fsSL https://code-server.dev/install.sh | sh
+  systemctl restart code-server@root 2>/dev/null || true
+  msg_ok "code-server updated"
+fi
+
+echo -e "\n ${CM} ${BOLD}${GN}All updates applied.${CL}\n"
+EOF
+chmod +x /usr/local/bin/update
+msg_ok "Installed 'update' command (/usr/local/bin/update)"
+
+# ─── 16. Scheduled updates (weekly cron) ─────────────────────────────────────────
 
 msg_info "Setting up weekly auto-update"
 cat > /etc/cron.weekly/claude-agentic-update <<'CRON'
