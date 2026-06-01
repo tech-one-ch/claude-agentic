@@ -176,12 +176,8 @@ msg_ok "Installed code-server (port 8443)"
 
 # ─── 10. Claude Code ──────────────────────────────────────────────────────────────
 
-msg_info "Installing Claude Code (native installer)"
-$STD curl -fsSL https://claude.ai/install.sh | bash
-# Ensure claude is on PATH
-for p in "$HOME/.local/bin/claude" "$HOME/.claude/bin/claude"; do
-  [[ -f "$p" ]] && ln -sf "$p" /usr/local/bin/claude 2>/dev/null && break
-done
+msg_info "Installing Claude Code"
+$STD npm install -g @anthropic-ai/claude-code
 msg_ok "Installed Claude Code $(claude --version 2>/dev/null || echo 'latest')"
 
 msg_info "Configuring Claude Code"
@@ -357,10 +353,7 @@ apt-get autoremove -y -qq
 msg_ok "System packages updated"
 
 msg_info "Updating Claude Code"
-curl -fsSL https://claude.ai/install.sh | bash
-for p in "$HOME/.local/bin/claude" "$HOME/.claude/bin/claude"; do
-  [[ -f "$p" ]] && ln -sf "$p" /usr/local/bin/claude 2>/dev/null && break
-done
+npm update -g @anthropic-ai/claude-code
 msg_ok "Claude Code updated ($(claude --version 2>/dev/null || echo 'latest'))"
 
 if command -v code-server &>/dev/null; then
@@ -381,7 +374,7 @@ msg_info "Setting up weekly auto-update"
 cat > /etc/cron.weekly/claude-agentic-update <<'CRON'
 #!/usr/bin/env bash
 apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq && apt-get autoremove -y -qq
-curl -fsSL https://claude.ai/install.sh | bash 2>/dev/null || true
+npm update -g @anthropic-ai/claude-code 2>/dev/null || true
 curl -fsSL https://code-server.dev/install.sh | sh 2>/dev/null || true
 systemctl restart code-server@root 2>/dev/null || true
 CRON
