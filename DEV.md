@@ -101,6 +101,31 @@ Claude has full access to `Bash`, `Read`, `Write`, `Edit`, `WebFetch`, `gh`, and
 
 ---
 
+## Logs
+
+### Mode Proxmox (community-scripts)
+Les logs sont gérés par `build.func` sur le **host Proxmox**.
+
+Logs persistants (dans `/var/log/community-scripts/` sur le host) :
+```bash
+dev_mode=logs bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+```
+
+Output complet de chaque commande :
+```bash
+VERBOSE=yes bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+```
+
+Sans ces options, les logs temporaires sont dans `/tmp/*.log` sur le host pendant l'exécution.
+
+### Mode standalone
+Tout est loggé dans le container/VM pendant l'installation :
+```bash
+tail -f /var/log/claude-agentic-install.log
+```
+
+---
+
 ## Repository structure
 
 ```
