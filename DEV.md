@@ -35,7 +35,7 @@ Automated installer for a full **Claude Code** development environment.
 Run on your **Proxmox host**:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-dev.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
 Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · privileged**
@@ -45,7 +45,7 @@ The interactive dialog lets you change all of these (Advanced mode).
 ### Update an existing LXC
 
 ```bash
-pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-dev.sh)"
+pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
 ---
@@ -55,7 +55,7 @@ pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-
 Run on your **existing VM, VPS, or LXC** as root:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/install/claude-dev-install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/install/claude-agentic-install.sh)"
 ```
 
 Tested on: **Ubuntu 22.04, Ubuntu 24.04, Debian 12**
@@ -106,9 +106,9 @@ Claude has full access to `Bash`, `Read`, `Write`, `Edit`, `WebFetch`, `gh`, and
 ```
 claude-agentic/
 ├── ct/
-│   └── claude-dev.sh          # Proxmox LXC creator (community-scripts style)
+│   └── claude-agentic.sh          # Proxmox LXC creator (community-scripts style)
 ├── install/
-│   └── claude-dev-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
+│   └── claude-agentic-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
 └── misc/
     └── update.sh              # Standalone updater
 ```
