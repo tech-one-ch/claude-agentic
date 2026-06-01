@@ -28,7 +28,7 @@ Automated installer for a full **Claude Code** development environment.
 Run on your **Proxmox host**:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/claude-dev/main/ct/claude-dev.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/ct/claude-dev.sh)"
 ```
 
 Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · privileged**
@@ -39,7 +39,7 @@ The interactive dialog lets you change all of these (Advanced mode).
 
 Run the same command from inside the container, or from the Proxmox host:
 ```bash
-pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/claude-dev/main/ct/claude-dev.sh)"
+pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/ct/claude-dev.sh)"
 ```
 
 ---
@@ -49,7 +49,7 @@ pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_
 Run on your **existing VM, VPS, or LXC** as root:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/claude-dev/main/install/claude-dev-install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/install/claude-dev-install.sh)"
 ```
 
 Tested on: **Ubuntu 22.04, Ubuntu 24.04, Debian 12**
@@ -57,7 +57,7 @@ Tested on: **Ubuntu 22.04, Ubuntu 24.04, Debian 12**
 ### Update standalone installation
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/claude-dev/main/misc/update.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/misc/update.sh)"
 ```
 
 ---
