@@ -129,21 +129,21 @@ cat /var/log/claude-agentic-install.log
 grep -i "error\|fail" /var/log/claude-agentic-install.log
 ```
 
-Logs + verbose combinés (recommandé pour debugger) :
+Logs + full verbose (recommended for debugging):
 ```bash
 REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
   dev_mode=logs VERBOSE=yes \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
-Persistent logs seulement (écrits dans `/var/log/community-scripts/` sur le host) :
+Persistent logs only (written to `/var/log/community-scripts/` on the host):
 ```bash
 REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
   dev_mode=logs \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
-Verbose seulement (chaque commande à l'écran) :
+Full verbose only (every command on screen):
 ```bash
 REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
   VERBOSE=yes \
