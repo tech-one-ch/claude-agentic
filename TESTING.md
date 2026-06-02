@@ -1,5 +1,31 @@
 # Testing & Verification Guide
 
+## Quick check (recommended)
+
+Run the check script inside the LXC or VM — checks all components at once and shows a summary:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh)
+```
+
+With export to file:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh) --export
+# or to a specific file:
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh) --export /tmp/results.txt
+```
+
+If the repo is cloned locally:
+```bash
+bash tests/check.sh
+bash tests/check.sh --export
+bash tests/check.sh --export /tmp/results.txt
+```
+
+---
+
+## Manual checks
+
 Run these commands inside the LXC or VM after installation to verify everything works.
 
 ---
@@ -18,7 +44,7 @@ df -h /
 free -h
 
 # Install log (check for errors)
-grep -i "error\|fail\|404\|fatal" /var/log/claude-agentic-install.log
+grep -E "^\[ERROR\]|^E:|^error:|Failed to|404 Not Found" /var/log/claude-agentic-install.log
 ```
 
 ---
