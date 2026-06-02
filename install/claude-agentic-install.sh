@@ -64,6 +64,30 @@ fi
 
 APP="${APP:-Claude Agentic}"
 
+# ─── IDE choice ────────────────────────────────────────────────────────────────
+# IDE_CHOICE: codeserver | tunnel | both | none
+# In community-scripts mode: set via environment variable before running
+# In standalone mode: interactive prompt
+
+if [[ -z "${IDE_CHOICE:-}" ]]; then
+  if [[ -t 0 ]]; then
+    echo -e "\n ${BOLD}Web IDE${CL}"
+    echo "  1) code-server   — VS Code in browser (port 8443)"
+    echo "  2) VS Code Tunnel — Microsoft relay (vscode.dev, no open port)"
+    echo "  3) Both"
+    echo "  4) None"
+    read -rp "  Choice [1]: " _ide_input
+    case "${_ide_input:-1}" in
+      2) IDE_CHOICE="tunnel" ;;
+      3) IDE_CHOICE="both" ;;
+      4) IDE_CHOICE="none" ;;
+      *) IDE_CHOICE="codeserver" ;;
+    esac
+  else
+    IDE_CHOICE="codeserver"
+  fi
+fi
+
 # ─── 1. Locale ──────────────────────────────────────────────────────────────────
 
 msg_info "Configuring locale"
@@ -162,22 +186,35 @@ log_run apt-get update
 log_run apt-get install -y gh
 msg_ok "Installed GitHub CLI $(gh --version | head -1 | cut -d' ' -f3)"
 
-# ─── 9. code-server ───────────────────────────────────────────────────────────────
+# ─── 9. Web IDE ───────────────────────────────────────────────────────────────────
 
-msg_info "Installing code-server"
-log_run curl -fsSL https://code-server.dev/install.sh | sh
+CS_PASSWORD=""
 
-CS_PASSWORD=$(openssl rand -hex 16)
-mkdir -p /root/.config/code-server
-cat > /root/.config/code-server/config.yaml <<EOF
+if [[ "$IDE_CHOICE" == "codeserver" || "$IDE_CHOICE" == "both" ]]; then
+  msg_info "Installing code-server"
+  log_run curl -fsSL https://code-server.dev/install.sh | sh
+  CS_PASSWORD=$(openssl rand -hex 16)
+  mkdir -p /root/.config/code-server
+  cat > /root/.config/code-server/config.yaml <<EOF
 bind-addr: 0.0.0.0:8443
 auth: password
 password: ${CS_PASSWORD}
 cert: true
 EOF
+  systemctl enable --now code-server@root &>/dev/null || true
+  msg_ok "Installed code-server (port 8443)"
+fi
 
-systemctl enable --now code-server@root &>/dev/null || true
-msg_ok "Installed code-server (port 8443)"
+if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
+  msg_info "Installing VS Code Tunnel (CLI)"
+  log_run curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' \
+    -o /tmp/vscode-cli.tar.gz
+  tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
+  rm -f /tmp/vscode-cli.tar.gz
+  # Install as systemd service (auth required on first use: run 'code tunnel')
+  /usr/local/bin/code tunnel service install --accept-server-license-terms 2>/dev/null || true
+  msg_ok "Installed VS Code Tunnel (run 'code tunnel' once to authenticate)"
+fi
 
 # ─── 10. Claude Code ──────────────────────────────────────────────────────────────
 
@@ -368,6 +405,15 @@ if command -v code-server &>/dev/null; then
   msg_ok "code-server updated"
 fi
 
+if command -v code &>/dev/null && code tunnel --version &>/dev/null 2>&1; then
+  msg_info "Updating VS Code Tunnel (CLI)"
+  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' \
+    -o /tmp/vscode-cli.tar.gz
+  tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
+  rm -f /tmp/vscode-cli.tar.gz
+  msg_ok "VS Code Tunnel updated"
+fi
+
 echo -e "\n ${CM} ${BOLD}${GN}All updates applied.${CL}\n"
 EOF
 chmod +x /usr/local/bin/update
@@ -408,18 +454,23 @@ msg_ok "Cleaned up"
 
 msg_info "Writing login banner"
 SERVER_IP=$(hostname -I | awk '{print $1}')
-cat > /etc/motd <<EOF
 
+IDE_LINES=""
+[[ "$IDE_CHOICE" == "codeserver" || "$IDE_CHOICE" == "both" ]] && \
+  IDE_LINES="${IDE_LINES}  ║  Code Server:  https://${SERVER_IP}:8443\n  ║  Password:     ${CS_PASSWORD}\n"
+[[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]] && \
+  IDE_LINES="${IDE_LINES}  ║  VS Code Tunnel: run 'code tunnel' once to authenticate\n"
+
+printf "
   ╔═══════════════════════════════════════════════════════╗
   ║           Claude Agentic Environment                  ║
   ╠═══════════════════════════════════════════════════════╣
-  ║  Code Server:  https://${SERVER_IP}:8443
-  ║  Password:     ${CS_PASSWORD}
-  ║                                                       ║
+%b  ║                                                       ║
   ║  Start Claude: claude                                 ║
   ║  Workspace:    /project                               ║
   ║  Plugins doc:  cat /project/CLAUDE.md                 ║
   ╚═══════════════════════════════════════════════════════╝
+" "$IDE_LINES" > /etc/motd
 
 EOF
 msg_ok "Login banner configured"
@@ -432,8 +483,10 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   cleanup_lxc
 else
   echo -e "\n ${CM} ${BOLD}${GN}Installation complete!${CL}\n"
-  echo -e "  ${INFO} Code Server : ${BOLD}https://${SERVER_IP}:8443${CL}"
-  echo -e "  ${INFO} Password    : ${BOLD}${CS_PASSWORD}${CL}"
+  [[ "$IDE_CHOICE" == "codeserver" || "$IDE_CHOICE" == "both" ]] && \
+    echo -e "  ${INFO} Code Server : ${BOLD}https://${SERVER_IP}:8443${CL}  (password: ${CS_PASSWORD})"
+  [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]] && \
+    echo -e "  ${INFO} VS Code Tunnel: run ${BOLD}code tunnel${CL} once to authenticate"
   echo -e "  ${INFO} Workspace   : ${BOLD}/project${CL}"
   echo -e "  ${INFO} Claude Code : run ${BOLD}claude${CL} and follow the login link\n"
   echo -e "  ${YW}Recommended first step in Claude Code:${CL}"
