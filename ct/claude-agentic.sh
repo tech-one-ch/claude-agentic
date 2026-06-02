@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+REPO_URL="${REPO_URL:-https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main}"
+source <(curl -fsSL "${REPO_URL}/misc/build.func")
 
 # Copyright (c) 2021-2026 community-scripts ORG
 # Author: Craftin535
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://www.anthropic.com/claude-code
 
-APP="Claude Dev"
+APP="Claude-Agentic"
 var_tags="${var_tags:-claude;development;ai}"
 var_cpu="${var_cpu:-4}"
 var_ram="${var_ram:-4096}"
 var_disk="${var_disk:-20}"
 var_os="${var_os:-ubuntu}"
 var_version="${var_version:-24.04}"
-var_unprivileged="${var_unprivileged:-0}"
+var_unprivileged="${var_unprivileged:-1}"
 var_nesting="${var_nesting:-1}"
+var_keyctl="${var_keyctl:-1}"
 
 header_info "$APP"
 variables
@@ -29,20 +31,11 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-
-  msg_info "Updating Claude Code"
-  $STD npm update -g @anthropic-ai/claude-code
-  msg_ok "Updated Claude Code ($(claude --version 2>/dev/null || echo 'latest'))"
-
-  msg_info "Updating code-server"
-  $STD curl -fsSL https://code-server.dev/install.sh | sh
-  $STD systemctl restart code-server@root
-  msg_ok "Updated code-server"
-
-  msg_info "Updating System Packages"
-  $STD apt-get update
-  $STD apt-get upgrade -y
-  msg_ok "Updated System Packages"
+  if [[ -x /usr/local/bin/update ]]; then
+    /usr/local/bin/update
+  else
+    msg_error "Update command not found. Re-run the installer to set it up."
+  fi
   exit
 }
 
@@ -59,11 +52,13 @@ if [[ -f /etc/pve/lxc/${CTID}.conf ]]; then
   fi
 fi
 
+CLEAN_IP=$(echo "${IP}" | tr -s ' \n' '\n' | grep -Eo '([0-9]+\.){3}[0-9]+' | tail -1)
+
 msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
 echo -e "${INFO}${YW} Code Server (VS Code in browser):${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}https://${IP}:8443${CL}"
-echo -e "${INFO}${YW} Password is displayed at first container login (MOTD)${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}https://${CLEAN_IP}:8443${CL}"
+echo -e "${INFO}${YW} Password and VS Code Tunnel info: ${BOLD}cat /etc/motd${CL} (inside container)"
 echo -e "${INFO}${YW} Run Claude Code inside the container:${CL}"
 echo -e "${TAB}${BOLD}pct exec ${CTID} -- claude${CL}"
 echo -e "${INFO}${YW} Open a shell in the container:${CL}"

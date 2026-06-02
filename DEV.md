@@ -1,4 +1,11 @@
-# Claude Agentic — Proxmox LXC & Standalone Installer
+# Claude Agentic — Development / Testing Branch
+
+> [!WARNING]
+> **This branch is for development and testing only.**
+> Scripts here are not verified and may be broken or incomplete.
+> For production use, refer to the [stable README](https://github.com/tech-one-ch/claude-agentic/blob/main/README.md) on `main`.
+
+---
 
 Automated installer for a full **Claude Code** development environment.
 
@@ -23,12 +30,13 @@ Automated installer for a full **Claude Code** development environment.
 
 ---
 
-## Option A — Proxmox LXC (recommended)
+## Option A — Proxmox LXC
 
 Run on your **Proxmox host**:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/ct/claude-agentic.sh)"
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
 Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · unprivileged**
@@ -44,7 +52,7 @@ update
 
 **Via curl from inside the LXC:**
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/misc/update.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/misc/update.sh)"
 ```
 
 **From the Proxmox host:**
@@ -59,7 +67,7 @@ pct exec <CTID> -- update
 Run on your **existing VM, VPS, or LXC** as root:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/install/claude-agentic-install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/install/claude-agentic-install.sh)"
 ```
 
 Tested on: **Ubuntu 22.04, Ubuntu 24.04, Debian 12**
@@ -73,7 +81,7 @@ update
 
 **Via curl:**
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/misc/update.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/misc/update.sh)"
 ```
 
 ---
@@ -117,6 +125,46 @@ Claude has full access to `Bash`, `Read`, `Write`, `Edit`, `WebFetch`, `gh`, and
 
 ---
 
+## Logs
+
+### Proxmox mode (community-scripts)
+
+Install log inside the container (available after install):
+```bash
+cat /var/log/claude-agentic-install.log
+grep -i "error\|fail" /var/log/claude-agentic-install.log
+```
+
+Logs + full verbose (recommended for debugging):
+```bash
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  dev_mode=logs VERBOSE=yes \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+```
+
+Persistent logs only (written to `/var/log/community-scripts/` on the host):
+```bash
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  dev_mode=logs \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+```
+
+Full verbose only (every command on screen):
+```bash
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  VERBOSE=yes \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+```
+
+### Standalone mode
+
+Everything is logged inside the container/VM during installation:
+```bash
+tail -f /var/log/claude-agentic-install.log
+```
+
+---
+
 ## Repository structure
 
 ```
@@ -126,8 +174,8 @@ claude-agentic/
 ├── install/
 │   └── claude-agentic-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
 ├── misc/
-│   └── update.sh              # Standalone updater (curl-able)
-└── TESTING.md                 # Verification & debug guide
+│   └── update.sh                  # Standalone updater (curl-able)
+└── TESTING.md                     # Verification & debug guide
 ```
 
 ---
