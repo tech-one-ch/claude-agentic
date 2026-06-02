@@ -9,19 +9,17 @@
 #   - Called by ct/claude-agentic.sh inside a Proxmox LXC (FUNCTIONS_FILE_PATH is set)
 #   - Can also run standalone on any existing Debian/Ubuntu system or VPS
 
-# ─── Logging ───────────────────────────────────────────────────────────────────
+# ─── Mode detection & logging ──────────────────────────────────────────────────
 
 LOG_FILE="/var/log/claude-agentic-install.log"
 mkdir -p "$(dirname "$LOG_FILE")"
-echo "=== Install started: $(date) ===" >> "$LOG_FILE"
-
-# log_run: runs a command silently, writes full output to log file
-log_run() { "$@" >>"$LOG_FILE" 2>&1; }
-
-# ─── Mode detection ────────────────────────────────────────────────────────────
 
 if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
-  # community-scripts mode: log_run writes to file, stdout stays clean for build.func
+  # community-scripts mode:
+  # - commands run normally, output goes to stdout (captured by build.func)
+  # - log_run is a transparent pass-through — no redirection, no interference
+  log_run() { "$@"; }
+  echo "=== Install started: $(date) ===" >> "$LOG_FILE"
   source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
   color
   verb_ip6
@@ -31,7 +29,10 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   update_os
 else
   # standalone mode: tee to both stdout and log file
+  echo "=== Install started: $(date) ===" >> "$LOG_FILE"
   exec > >(tee -a "$LOG_FILE") 2>&1
+  # log_run redirects output to log file only (screen stays clean)
+  log_run() { "$@" >>"$LOG_FILE" 2>&1; }
 
   YW=$(printf '\033[33m')
   GN=$(printf '\033[1;92m')
