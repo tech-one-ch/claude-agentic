@@ -476,8 +476,6 @@ printf "
   ║  Plugins doc:  cat /project/CLAUDE.md                 ║
   ╚═══════════════════════════════════════════════════════╝
 " "$IDE_LINES" > /etc/motd
-
-EOF
 msg_ok "Login banner configured"
 
 # ─── Done ─────────────────────────────────────────────────────────────────────────
