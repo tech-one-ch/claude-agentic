@@ -7,7 +7,7 @@ source <(curl -fsSL "${REPO_URL}/misc/build.func")
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://www.anthropic.com/claude-code
 
-APP="Claude Agentic"
+APP="Claude-Agentic"
 var_tags="${var_tags:-claude;development;ai}"
 var_cpu="${var_cpu:-4}"
 var_ram="${var_ram:-4096}"
