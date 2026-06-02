@@ -78,7 +78,7 @@ if [[ -z "${IDE_CHOICE:-}" ]]; then
     echo "  2) VS Code Tunnel — Microsoft relay (vscode.dev, no open port)"
     echo "  3) Both"
     echo "  4) None"
-    read -rp "  Choice [1]: " _ide_input
+    read -rt 60 -p "  Choice [1, default in 60s]: " _ide_input || true
     case "${_ide_input:-1}" in
       2) IDE_CHOICE="tunnel" ;;
       3) IDE_CHOICE="both" ;;
