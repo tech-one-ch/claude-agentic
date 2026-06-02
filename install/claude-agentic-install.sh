@@ -84,10 +84,10 @@ if [[ -z "${IDE_CHOICE:-}" ]]; then
       2) IDE_CHOICE="tunnel" ;;
       3) IDE_CHOICE="both" ;;
       4) IDE_CHOICE="none" ;;
-      *) IDE_CHOICE="codeserver" ;;
+      *) IDE_CHOICE="both" ;;
     esac
   else
-    IDE_CHOICE="codeserver"
+    IDE_CHOICE="both"
   fi
 fi
 
@@ -209,12 +209,11 @@ EOF
 fi
 
 if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
-  msg_info "Installing VS Code Tunnel (CLI)"
-  log_run curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' \
-    -o /tmp/vscode-cli.tar.gz
+  msg_info "Installing VS Code Tunnel CLI (~65 MB, may take a few minutes)"
+  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' \
+    -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1
   tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
   rm -f /tmp/vscode-cli.tar.gz
-  # Install as systemd service (auth required on first use: run 'code tunnel')
   /usr/local/bin/code tunnel service install --accept-server-license-terms 2>/dev/null || true
   msg_ok "Installed VS Code Tunnel (run 'code tunnel' once to authenticate)"
 fi

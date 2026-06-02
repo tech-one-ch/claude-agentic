@@ -52,11 +52,13 @@ if [[ -f /etc/pve/lxc/${CTID}.conf ]]; then
   fi
 fi
 
+CLEAN_IP=$(echo "${IP}" | tr -s ' \n' '\n' | grep -Eo '([0-9]+\.){3}[0-9]+' | tail -1)
+
 msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
 echo -e "${INFO}${YW} Code Server (VS Code in browser):${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}https://${IP}:8443${CL}"
-echo -e "${INFO}${YW} Password is displayed at first container login (MOTD)${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}https://${CLEAN_IP}:8443${CL}"
+echo -e "${INFO}${YW} Password and VS Code Tunnel info: ${BOLD}cat /etc/motd${CL} (inside container)"
 echo -e "${INFO}${YW} Run Claude Code inside the container:${CL}"
 echo -e "${TAB}${BOLD}pct exec ${CTID} -- claude${CL}"
 echo -e "${INFO}${YW} Open a shell in the container:${CL}"
