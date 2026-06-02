@@ -44,7 +44,8 @@ msg_ok "System packages updated"
 
 if command -v claude &>/dev/null; then
   msg_info "Updating Claude Code"
-  npm update -g @anthropic-ai/claude-code
+  curl -fsSL https://claude.ai/install.sh | bash \
+    || npm update -g @anthropic-ai/claude-code
   msg_ok "Claude Code updated ($(claude --version 2>/dev/null || echo 'latest'))"
 else
   msg_error "Claude Code not found — run the installer first"

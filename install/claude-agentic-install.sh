@@ -9,20 +9,19 @@
 #   - Called by ct/claude-agentic.sh inside a Proxmox LXC (FUNCTIONS_FILE_PATH is set)
 #   - Can also run standalone on any existing Debian/Ubuntu system or VPS
 
-# ─── Logging (both modes) ──────────────────────────────────────────────────────
+# ─── Logging ───────────────────────────────────────────────────────────────────
 
 LOG_FILE="/var/log/claude-agentic-install.log"
 mkdir -p "$(dirname "$LOG_FILE")"
-exec > >(tee -a "$LOG_FILE") 2>&1
-echo "=== Install started: $(date) ==="
+echo "=== Install started: $(date) ===" >> "$LOG_FILE"
 
-# log_run: runs a command, shows nothing on screen but writes full output to log
-# Use instead of log_run so failures are always traceable
+# log_run: runs a command silently, writes full output to log file
 log_run() { "$@" >>"$LOG_FILE" 2>&1; }
 
 # ─── Mode detection ────────────────────────────────────────────────────────────
 
 if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
+  # community-scripts mode: log_run writes to file, stdout stays clean for build.func
   source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
   color
   verb_ip6
@@ -31,6 +30,9 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   network_check
   update_os
 else
+  # standalone mode: tee to both stdout and log file
+  exec > >(tee -a "$LOG_FILE") 2>&1
+
   YW=$(printf '\033[33m')
   GN=$(printf '\033[1;92m')
   RD=$(printf '\033[01;31m')
@@ -219,7 +221,8 @@ fi
 # ─── 10. Claude Code ──────────────────────────────────────────────────────────────
 
 msg_info "Installing Claude Code"
-log_run npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash >>"$LOG_FILE" 2>&1 \
+  || log_run npm install -g @anthropic-ai/claude-code
 msg_ok "Installed Claude Code $(claude --version 2>/dev/null || echo 'latest')"
 
 msg_info "Configuring Claude Code"
@@ -395,7 +398,8 @@ apt-get autoremove -y -qq
 msg_ok "System packages updated"
 
 msg_info "Updating Claude Code"
-npm update -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash \
+  || npm update -g @anthropic-ai/claude-code
 msg_ok "Claude Code updated ($(claude --version 2>/dev/null || echo 'latest'))"
 
 if command -v code-server &>/dev/null; then
@@ -425,7 +429,7 @@ msg_info "Setting up weekly auto-update"
 cat > /etc/cron.weekly/claude-agentic-update <<'CRON'
 #!/usr/bin/env bash
 apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq && apt-get autoremove -y -qq
-npm update -g @anthropic-ai/claude-code 2>/dev/null || true
+curl -fsSL https://claude.ai/install.sh | bash 2>/dev/null || npm update -g @anthropic-ai/claude-code 2>/dev/null || true
 curl -fsSL https://code-server.dev/install.sh | sh 2>/dev/null || true
 systemctl restart code-server@root 2>/dev/null || true
 CRON
