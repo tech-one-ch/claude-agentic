@@ -216,12 +216,11 @@ fi
 
 if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
   msg_info "Installing VS Code Tunnel CLI (~65 MB, may take a few minutes)"
-  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' \
+  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
     -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1
   tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
   rm -f /tmp/vscode-cli.tar.gz
-  /usr/local/bin/code tunnel service install --accept-server-license-terms 2>/dev/null || true
-  msg_ok "Installed VS Code Tunnel (run 'code tunnel' once to authenticate)"
+  msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
 fi
 
 # ─── 10. Claude Code ──────────────────────────────────────────────────────────────
@@ -415,9 +414,9 @@ if command -v code-server &>/dev/null; then
   msg_ok "code-server updated"
 fi
 
-if command -v code &>/dev/null && code tunnel --version &>/dev/null 2>&1; then
+if command -v code &>/dev/null; then
   msg_info "Updating VS Code Tunnel (CLI)"
-  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' \
+  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
     -o /tmp/vscode-cli.tar.gz
   tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
   rm -f /tmp/vscode-cli.tar.gz
