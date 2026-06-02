@@ -1,38 +1,8 @@
 # Testing & Verification Guide
 
-## Quick check (recommended)
+## Quick check
 
-Run the check script inside the LXC or VM — checks all components at once and shows a summary.
-
-### From `main` (stable)
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh)
-```
-
-### From `dev` (testing)
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/tests/check.sh)
-```
-
-### With export to file
-
-```bash
-# Auto-named file
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh) --export
-
-# Specific file
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh) --export /tmp/results.txt
-```
-
-### If the repo is cloned locally
-
-```bash
-bash tests/check.sh
-bash tests/check.sh --export
-bash tests/check.sh --export /tmp/results.txt
-```
+For the automated check script (all options including Supabase integration), see **[CHECK.md](CHECK.md)**.
 
 ---
 

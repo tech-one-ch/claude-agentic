@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Claude Agentic — Installation check script
-# Usage: bash tests/check.sh [--export [file]]
+# Usage: bash tests/check.sh [--export [file]] [--supabase]
+# Docs:  https://github.com/tech-one-ch/claude-agentic/blob/main/CHECK.md
 
 set -uo pipefail
 
@@ -19,12 +20,27 @@ LBL_FAIL="${RD}✖ FAIL${CL}"
 LBL_WARN="${YW}⚠ WARN${CL}"
 LBL_SKIP="${DIM}– SKIP${CL}"
 
-# ─── Export option ─────────────────────────────────────────────────────────────
+# ─── Flag parsing ──────────────────────────────────────────────────────────────
 
 EXPORT_FILE=""
-if [[ "${1:-}" == "--export" ]]; then
-  EXPORT_FILE="${2:-check-results-$(date +%Y%m%d-%H%M%S).txt}"
-fi
+USE_SUPABASE=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --export)
+      shift
+      if [[ $# -gt 0 && "${1:-}" != --* ]]; then
+        EXPORT_FILE="$1"; shift
+      else
+        EXPORT_FILE="check-results-$(date +%Y%m%d-%H%M%S).txt"
+      fi
+      ;;
+    --supabase)
+      USE_SUPABASE=1; shift
+      ;;
+    *) shift ;;
+  esac
+done
 
 # ─── Result tracking ───────────────────────────────────────────────────────────
 
@@ -33,11 +49,10 @@ FAIL_COUNT=0
 WARN_COUNT=0
 SKIP_COUNT=0
 declare -a LINES=()
+declare -a JSON_CHECKS=()
 
 record() {
-  local label="$1"
-  local status="$2"   # pass | fail | warn | skip
-  local detail="$3"
+  local label="$1" status="$2" detail="$3"
   local lbl
   case "$status" in
     pass) lbl="$LBL_PASS"; PASS_COUNT=$((PASS_COUNT+1)) ;;
@@ -46,101 +61,169 @@ record() {
     skip) lbl="$LBL_SKIP"; SKIP_COUNT=$((SKIP_COUNT+1)) ;;
   esac
   LINES+=("  ${lbl}  ${BOLD}${label}${CL}  ${DIM}${detail}${CL}")
+  local el="${label//\"/\\\"}"; local ed="${detail//\"/\\\"}"
+  JSON_CHECKS+=("{\"label\":\"${el}\",\"status\":\"${status}\",\"detail\":\"${ed}\"}")
 }
 
-# ─── Helper: check a command version ───────────────────────────────────────────
+flush() {
+  for l in "${LINES[@]:-}"; do [[ -n "$l" ]] && echo -e "$l"; done
+  LINES=()
+}
+
+# ─── Check helpers ─────────────────────────────────────────────────────────────
 
 check_cmd() {
-  local label="$1"
-  local cmd="$2"
-  local version_cmd="${3:-$cmd --version}"
-  local output
+  local label="$1" cmd="$2" version_cmd="${3:-$cmd --version}"
   if ! command -v "$cmd" &>/dev/null; then
-    record "$label" fail "not found"
-    return
+    record "$label" fail "not found"; return
   fi
-  output=$(eval "$version_cmd" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//')
-  record "$label" pass "${output:-OK}"
+  local out; out=$(eval "$version_cmd" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//')
+  record "$label" pass "${out:-OK}"
 }
-
-# ─── Helper: check a systemd service ───────────────────────────────────────────
 
 check_service() {
-  local label="$1"
-  local service="$2"
-  local status
-  status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
-  if [[ "$status" == "active" ]]; then
-    record "$label" pass "active"
-  else
-    record "$label" fail "$status"
-  fi
+  local label="$1" service="$2"
+  local status; status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+  [[ "$status" == "active" ]] && record "$label" pass "active" \
+                               || record "$label" fail "$status"
 }
 
-# ─── Helper: check a file or directory ─────────────────────────────────────────
-
 check_path() {
-  local label="$1"
-  local path="$2"
-  if [[ -e "$path" ]]; then
-    record "$label" pass "$path"
-  else
-    record "$label" fail "$path not found"
-  fi
+  local label="$1" path="$2"
+  [[ -e "$path" ]] && record "$label" pass "$path" \
+                   || record "$label" fail "$path not found"
 }
 
 # ─── Environment detection ─────────────────────────────────────────────────────
 
 detect_env() {
-  if [[ -f /.dockerenv ]]; then
-    echo "Docker container"
-    return
-  fi
-  if grep -qi "microsoft" /proc/version 2>/dev/null; then
-    echo "WSL"
-    return
-  fi
+  if [[ -f /.dockerenv ]]; then echo "Docker container"; return; fi
+  if grep -qi "microsoft" /proc/version 2>/dev/null; then echo "WSL"; return; fi
   if command -v systemd-detect-virt &>/dev/null; then
-    local virt
-    virt=$(systemd-detect-virt 2>/dev/null)
-    case "$virt" in
+    local v; v=$(systemd-detect-virt 2>/dev/null)
+    case "$v" in
       lxc|lxc-libvirt) echo "LXC container" ;;
       kvm)             echo "VM (KVM/QEMU)" ;;
       vmware)          echo "VM (VMware)" ;;
       xen)             echo "VM (Xen)" ;;
       microsoft)       echo "VM (Hyper-V)" ;;
       none)            echo "Physical machine" ;;
-      *)               echo "VM ($virt)" ;;
+      *)               echo "VM ($v)" ;;
     esac
     return
   fi
-  if grep -q "container=lxc" /proc/1/environ 2>/dev/null; then
-    echo "LXC container"
-    return
-  fi
-  echo "Unknown"
+  grep -q "container=lxc" /proc/1/environ 2>/dev/null && echo "LXC container" || echo "Unknown"
 }
 
-# ─── Header ────────────────────────────────────────────────────────────────────
+# ─── Supabase ──────────────────────────────────────────────────────────────────
+
+send_to_supabase() {
+  local supa_url="${SUPABASE_URL:-}" supa_key="${SUPABASE_KEY:-}"
+
+  echo ""
+  echo -e "  ${BOLD}${BL}Supabase${CL}"
+
+  if [[ -z "$supa_url" ]]; then
+    echo -ne "  URL (e.g. https://abc123.supabase.co): "
+    read -r supa_url
+  else
+    echo -e "  URL: ${DIM}${supa_url}${CL}"
+  fi
+
+  if [[ -z "$supa_key" ]]; then
+    echo -ne "  Service role key: "
+    read -rsp "" supa_key
+    echo ""
+  else
+    echo -e "  Key: ${DIM}[from env]${CL}"
+  fi
+
+  # Build JSON
+  local details
+  if [[ ${#JSON_CHECKS[@]} -gt 0 ]]; then
+    details=$(printf '%s,' "${JSON_CHECKS[@]}")
+    details="[${details%,}]"
+  else
+    details="[]"
+  fi
+
+  local payload
+  payload=$(printf \
+    '{"hostname":"%s","env_type":"%s","os_name":"%s","ip":"%s","pass_count":%d,"fail_count":%d,"warn_count":%d,"skip_count":%d,"details":%s}' \
+    "$HOSTNAME_VAL" "$ENV_TYPE" "$OS_NAME" "${IP:-}" \
+    "$PASS_COUNT" "$FAIL_COUNT" "$WARN_COUNT" "$SKIP_COUNT" \
+    "$details")
+
+  local response http_code
+  response=$(curl -s -o /tmp/_supa_resp.txt -w "%{http_code}" \
+    -X POST "${supa_url}/rest/v1/claude_agentic_checks" \
+    -H "apikey: ${supa_key}" \
+    -H "Authorization: Bearer ${supa_key}" \
+    -H "Content-Type: application/json" \
+    -H "Prefer: return=minimal" \
+    -d "$payload" 2>/dev/null)
+  http_code="$response"
+  local body; body=$(cat /tmp/_supa_resp.txt 2>/dev/null); rm -f /tmp/_supa_resp.txt
+
+  local project_ref="${supa_url#https://}"; project_ref="${project_ref%.supabase.co}"
+
+  if [[ "$http_code" == "201" ]]; then
+    echo -e "  ${GN}✔${CL} Sent successfully"
+    echo -e "  ${DIM}View: https://supabase.com/dashboard/project/${project_ref}/editor${CL}"
+
+  elif echo "$body" | grep -q "42P01\|does not exist"; then
+    echo -e "  ${YW}⚠${CL} Table not found. Create it once in your Supabase SQL editor:"
+    echo -e "  ${DIM}https://supabase.com/dashboard/project/${project_ref}/sql/new${CL}"
+    echo ""
+    echo -e "${DIM}"
+    cat << 'SQL'
+  CREATE TABLE IF NOT EXISTS claude_agentic_checks (
+    id          uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at  timestamptz DEFAULT now(),
+    hostname    text,
+    env_type    text,
+    os_name     text,
+    ip          text,
+    pass_count  int,
+    fail_count  int,
+    warn_count  int,
+    skip_count  int,
+    details     jsonb
+  );
+
+  -- Allow inserts with the service_role key (RLS off or policy below)
+  ALTER TABLE claude_agentic_checks ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "service_role insert" ON claude_agentic_checks
+    FOR INSERT WITH CHECK (true);
+SQL
+    echo -e "${CL}"
+    echo -e "  Then re-run: ${BOLD}bash tests/check.sh --supabase${CL}"
+
+  else
+    echo -e "  ${RD}✖${CL} Error (HTTP ${http_code}): ${body}"
+  fi
+}
+
+# ─── Main output ───────────────────────────────────────────────────────────────
 
 ENV_TYPE=$(detect_env)
 OS_NAME=$(grep -oP '(?<=^PRETTY_NAME=").*(?=")' /etc/os-release 2>/dev/null || echo "Unknown OS")
-HOSTNAME=$(hostname)
-DATE=$(date '+%Y-%m-%d %H:%M:%S')
+HOSTNAME_VAL=$(hostname)
 IP=$(hostname -I | tr -s ' \n' '\n' | grep -Eo '([0-9]+\.){3}[0-9]+' | tail -1)
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
-output() {
+run_checks() {
   echo ""
   echo -e "${BOLD}${BL}  Claude Agentic — Installation Check${CL}"
   echo -e "  ${DIM}${DATE}${CL}"
   echo ""
   echo -e "  ${BOLD}Environment:${CL}  $ENV_TYPE"
-  echo -e "  ${BOLD}Hostname:${CL}     $HOSTNAME"
+  echo -e "  ${BOLD}Hostname:${CL}     $HOSTNAME_VAL"
   echo -e "  ${BOLD}OS:${CL}           $OS_NAME"
   echo -e "  ${BOLD}IP:${CL}           ${IP:-N/A}"
   echo ""
 
-  # ── 1. Languages & runtimes ─────────────────────────────────────────────────
+  # 1. Languages
   echo -e "  ${BOLD}Languages & runtimes${CL}"
   check_cmd "Node.js"  "node"    "node --version"
   check_cmd "npm"      "npm"     "npm --version"
@@ -148,110 +231,83 @@ output() {
   check_cmd "Go"       "go"      "go version"
   check_cmd "Rust"     "rustc"   "rustc --version"
   check_cmd "Cargo"    "cargo"   "cargo --version"
+  flush; echo ""
 
-  for l in "${LINES[@]}"; do echo -e "$l"; done
-  LINES=()
-  echo ""
-
-  # ── 2. Dev tools ─────────────────────────────────────────────────────────────
+  # 2. Dev tools
   echo -e "  ${BOLD}Dev tools${CL}"
-  check_cmd "git"     "git"     "git --version"
-  check_cmd "jq"      "jq"      "jq --version"
-  check_cmd "yq"      "yq"      "yq --version"
-  check_cmd "ripgrep" "rg"      "rg --version"
-  check_cmd "fd"      "fd"      "fd --version"
-  check_cmd "fzf"     "fzf"     "fzf --version"
-  check_cmd "bat"     "bat"     "bat --version"
-  check_cmd "tmux"    "tmux"    "tmux -V"
-  check_cmd "gh"      "gh"      "gh --version"
+  check_cmd "git"     "git"  "git --version"
+  check_cmd "jq"      "jq"   "jq --version"
+  check_cmd "yq"      "yq"   "yq --version"
+  check_cmd "ripgrep" "rg"   "rg --version"
+  check_cmd "fd"      "fd"   "fd --version"
+  check_cmd "fzf"     "fzf"  "fzf --version"
+  check_cmd "bat"     "bat"  "bat --version"
+  check_cmd "tmux"    "tmux" "tmux -V"
+  check_cmd "gh"      "gh"   "gh --version"
+  flush; echo ""
 
-  for l in "${LINES[@]}"; do echo -e "$l"; done
-  LINES=()
-  echo ""
-
-  # ── 3. Docker ────────────────────────────────────────────────────────────────
+  # 3. Docker
   echo -e "  ${BOLD}Docker${CL}"
-  check_cmd     "docker"          "docker"  "docker --version"
-  check_service "docker service"  "docker"
+  check_cmd "docker" "docker" "docker --version"
+  check_service "docker service" "docker"
   if command -v docker &>/dev/null && systemctl is-active docker &>/dev/null; then
-    local compose_out
-    compose_out=$(docker compose version 2>/dev/null | head -1)
-    if [[ -n "$compose_out" ]]; then
-      record "docker compose" pass "$compose_out"
-    else
-      record "docker compose" fail "plugin not found"
-    fi
+    local co; co=$(docker compose version 2>/dev/null | head -1)
+    [[ -n "$co" ]] && record "docker compose" pass "$co" \
+                   || record "docker compose" fail "plugin not found"
   else
     record "docker compose" skip "docker not running"
   fi
+  flush; echo ""
 
-  for l in "${LINES[@]}"; do echo -e "$l"; done
-  LINES=()
-  echo ""
-
-  # ── 4. Claude Code ───────────────────────────────────────────────────────────
+  # 4. Claude Code
   echo -e "  ${BOLD}Claude Code${CL}"
-  check_cmd  "claude"           "claude"  "claude --version"
-  check_path "settings.json"   "/root/.claude/settings.json"
-  check_path "workspace"       "/project"
-  check_path "CLAUDE.md"       "/project/CLAUDE.md"
+  check_cmd  "claude"         "claude" "claude --version"
+  check_path "settings.json" "/root/.claude/settings.json"
+  check_path "workspace"     "/project"
+  check_path "CLAUDE.md"     "/project/CLAUDE.md"
+  flush; echo ""
 
-  for l in "${LINES[@]}"; do echo -e "$l"; done
-  LINES=()
-  echo ""
-
-  # ── 5. Web IDE ───────────────────────────────────────────────────────────────
+  # 5. Web IDE
   echo -e "  ${BOLD}Web IDE${CL}"
-  check_cmd     "code-server"        "code-server"  "code-server --version"
-  check_service "code-server@root"   "code-server@root"
+  check_cmd     "code-server"       "code-server" "code-server --version"
+  check_service "code-server@root"  "code-server@root"
   if command -v code &>/dev/null; then
     check_cmd "VS Code Tunnel CLI" "code" "code --version"
   else
     record "VS Code Tunnel CLI" skip "not installed"
   fi
+  flush; echo ""
 
-  for l in "${LINES[@]}"; do echo -e "$l"; done
-  LINES=()
-  echo ""
-
-  # ── 6. System ────────────────────────────────────────────────────────────────
+  # 6. System
   echo -e "  ${BOLD}System${CL}"
-  check_cmd  "update command"  "update"  "which update"
-  check_path "install log"     "/var/log/claude-agentic-install.log"
+  check_cmd  "update command" "update" "which update"
+  check_path "install log"   "/var/log/claude-agentic-install.log"
+  local disk; disk=$(df -h / | awk 'NR==2{print $3 " used / " $2 " total (" $5 " used)"}')
+  record "disk /"  pass "$disk"
+  local mem; mem=$(free -h | awk '/^Mem:/{print $3 " used / " $2 " total"}')
+  record "memory" pass "$mem"
+  flush; echo ""
 
-  local disk_use
-  disk_use=$(df -h / | awk 'NR==2{print $3 " used / " $2 " total (" $5 " used)"}')
-  record "disk /" pass "$disk_use"
-
-  local mem_use
-  mem_use=$(free -h | awk '/^Mem:/{print $3 " used / " $2 " total"}')
-  record "memory" pass "$mem_use"
-
-  for l in "${LINES[@]}"; do echo -e "$l"; done
-  LINES=()
-  echo ""
-
-  # ── Summary ──────────────────────────────────────────────────────────────────
-  local total=$((PASS_COUNT + FAIL_COUNT + WARN_COUNT + SKIP_COUNT))
-  echo -e "  ─────────────────────────────────────────"
+  # Summary
+  local total=$((PASS_COUNT+FAIL_COUNT+WARN_COUNT+SKIP_COUNT))
+  echo -e "  ─────────────────────────────────────────────────────"
   echo -e "  ${BOLD}Results${CL}  ${GN}${PASS_COUNT} passed${CL}  ${RD}${FAIL_COUNT} failed${CL}  ${YW}${WARN_COUNT} warnings${CL}  ${DIM}${SKIP_COUNT} skipped${CL}  (${total} total)"
-
   if [[ $FAIL_COUNT -eq 0 ]]; then
     echo -e "  ${GN}${BOLD}All checks passed.${CL}"
   else
     echo -e "  ${RD}${BOLD}${FAIL_COUNT} check(s) failed — review the items above.${CL}"
   fi
   echo ""
+
+  [[ $USE_SUPABASE -eq 1 ]] && send_to_supabase
 }
 
-# ─── Run & optionally export ───────────────────────────────────────────────────
+# ─── Run & export ──────────────────────────────────────────────────────────────
 
 if [[ -n "$EXPORT_FILE" ]]; then
-  output | tee "$EXPORT_FILE"
-  # Strip ANSI codes from the exported file
+  run_checks | tee "$EXPORT_FILE"
   sed -i 's/\x1b\[[0-9;]*m//g' "$EXPORT_FILE"
-  echo -e "  ${BL}Results exported to: ${BOLD}${EXPORT_FILE}${CL}"
-  echo ""
+  echo -e "  ${BL}Exported to: ${BOLD}${EXPORT_FILE}${CL}\n"
 else
-  output
+  run_checks
 fi
