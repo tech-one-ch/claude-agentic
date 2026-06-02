@@ -1,4 +1,4 @@
-# Claude Dev — Proxmox LXC & Standalone Installer
+# Claude Agentic — Proxmox LXC & Standalone Installer
 
 Automated installer for a full **Claude Code** development environment.
 

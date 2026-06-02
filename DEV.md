@@ -35,7 +35,8 @@ Automated installer for a full **Claude Code** development environment.
 Run on your **Proxmox host**:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
 Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · unprivileged**
@@ -128,14 +129,25 @@ cat /var/log/claude-agentic-install.log
 grep -i "error\|fail" /var/log/claude-agentic-install.log
 ```
 
-Persistent logs on the Proxmox host (written to `/var/log/community-scripts/`):
+Logs + verbose combinés (recommandé pour debugger) :
 ```bash
-dev_mode=logs bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  dev_mode=logs VERBOSE=yes \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
-Full verbose output (every command):
+Persistent logs seulement (écrits dans `/var/log/community-scripts/` sur le host) :
 ```bash
-VERBOSE=yes bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  dev_mode=logs \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+```
+
+Verbose seulement (chaque commande à l'écran) :
+```bash
+REPO_URL="https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev" \
+  VERBOSE=yes \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
 ### Standalone mode

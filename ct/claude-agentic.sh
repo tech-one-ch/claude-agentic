@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/misc/build.func)
+REPO_URL="${REPO_URL:-https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main}"
+source <(curl -fsSL "${REPO_URL}/misc/build.func")
 
 # Copyright (c) 2021-2026 community-scripts ORG
 # Author: Craftin535
