@@ -1,4 +1,4 @@
-# Claude Dev — Development / Testing Branch
+# Claude Agentic — Development / Testing Branch
 
 > [!WARNING]
 > **This branch is for development and testing only.**
@@ -24,7 +24,7 @@ Automated installer for a full **Claude Code** development environment.
 | **Python** | 3.x | + pip, pipx, uv |
 | **Go** | latest | |
 | **Rust** | latest | via rustup |
-| **Docker** | latest | + Compose, Watchtower |
+| **Docker** | latest | + Compose plugin |
 | **GitHub CLI** | latest | `gh` — for PR automation |
 | **Dev tools** | — | ripgrep, fd, fzf, bat, tmux, htop… |
 
@@ -38,14 +38,25 @@ Run on your **Proxmox host**:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
-Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · privileged**
+Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · unprivileged**
 
 The interactive dialog lets you change all of these (Advanced mode).
 
 ### Update an existing LXC
 
+**From inside the LXC** (recommended — just type):
 ```bash
-pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
+update
+```
+
+**Via curl from inside the LXC:**
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/misc/update.sh)"
+```
+
+**From the Proxmox host:**
+```bash
+pct exec <CTID> -- update
 ```
 
 ---
@@ -62,6 +73,12 @@ Tested on: **Ubuntu 22.04, Ubuntu 24.04, Debian 12**
 
 ### Update standalone installation
 
+**Type directly (if already installed):**
+```bash
+update
+```
+
+**Via curl:**
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/misc/update.sh)"
 ```
@@ -76,7 +93,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
 
 2. **Start Claude Code** from the Code Server terminal:
    ```bash
-   cd /root/projects
+   cd /project
    claude
    ```
    At first launch, Claude shows a login link — open it in your browser to authenticate with your Anthropic account (no API key needed).
@@ -93,7 +110,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
 Once everything is set up, Claude Code can create PRs automatically:
 
 ```bash
-cd /root/projects/my-repo
+cd /project/my-repo
 claude "Add a dark mode toggle to the settings page, then open a PR on GitHub"
 ```
 
@@ -104,9 +121,14 @@ Claude has full access to `Bash`, `Read`, `Write`, `Edit`, `WebFetch`, `gh`, and
 ## Logs
 
 ### Proxmox mode (community-scripts)
-Logs are handled by `build.func` on the **Proxmox host**.
 
-Persistent logs (written to `/var/log/community-scripts/` on the host):
+Install log inside the container (available after install):
+```bash
+cat /var/log/claude-agentic-install.log
+grep -i "error\|fail" /var/log/claude-agentic-install.log
+```
+
+Persistent logs on the Proxmox host (written to `/var/log/community-scripts/`):
 ```bash
 dev_mode=logs bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
@@ -116,9 +138,8 @@ Full verbose output (every command):
 VERBOSE=yes bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/ct/claude-agentic.sh)"
 ```
 
-Without these options, temporary logs are available in `/tmp/*.log` on the host during execution.
-
 ### Standalone mode
+
 Everything is logged inside the container/VM during installation:
 ```bash
 tail -f /var/log/claude-agentic-install.log
@@ -134,8 +155,9 @@ claude-agentic/
 │   └── claude-agentic.sh          # Proxmox LXC creator (community-scripts style)
 ├── install/
 │   └── claude-agentic-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
-└── misc/
-    └── update.sh              # Standalone updater
+├── misc/
+│   └── update.sh                  # Standalone updater (curl-able)
+└── TESTING.md                     # Verification & debug guide
 ```
 
 ---

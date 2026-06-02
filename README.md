@@ -17,7 +17,7 @@ Automated installer for a full **Claude Code** development environment.
 | **Python** | 3.x | + pip, pipx, uv |
 | **Go** | latest | |
 | **Rust** | latest | via rustup |
-| **Docker** | latest | + Compose, Watchtower |
+| **Docker** | latest | + Compose plugin |
 | **GitHub CLI** | latest | `gh` — for PR automation |
 | **Dev tools** | — | ripgrep, fd, fzf, bat, tmux, htop… |
 
@@ -31,7 +31,7 @@ Run on your **Proxmox host**:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/ct/claude-agentic.sh)"
 ```
 
-Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · privileged**
+Default resources: **4 vCPU · 4 GB RAM · 20 GB disk · Ubuntu 24.04 · unprivileged**
 
 The interactive dialog lets you change all of these (Advanced mode).
 
@@ -86,7 +86,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
 
 2. **Start Claude Code** from the Code Server terminal:
    ```bash
-   cd /root/projects
+   cd /project
    claude
    ```
    At first launch, Claude shows a login link — open it in your browser to authenticate with your Anthropic account (no API key needed).
@@ -103,7 +103,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
 Once everything is set up, Claude Code can create PRs automatically:
 
 ```bash
-cd /root/projects/my-repo
+cd /project/my-repo
 claude "Add a dark mode toggle to the settings page, then open a PR on GitHub"
 ```
 
@@ -119,8 +119,9 @@ claude-agentic/
 │   └── claude-agentic.sh          # Proxmox LXC creator (community-scripts style)
 ├── install/
 │   └── claude-agentic-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
-└── misc/
-    └── update.sh              # Standalone updater
+├── misc/
+│   └── update.sh              # Standalone updater (curl-able)
+└── TESTING.md                 # Verification & debug guide
 ```
 
 ---
