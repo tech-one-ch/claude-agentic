@@ -37,9 +37,19 @@ The interactive dialog lets you change all of these (Advanced mode).
 
 ### Update an existing LXC
 
-Run the same command from inside the container, or from the Proxmox host:
+**From inside the LXC** (recommended — just type):
 ```bash
-pct exec <CTID> -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/ct/claude-agentic.sh)"
+update
+```
+
+**Via curl from inside the LXC:**
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/misc/update.sh)"
+```
+
+**From the Proxmox host:**
+```bash
+pct exec <CTID> -- update
 ```
 
 ---
@@ -56,6 +66,12 @@ Tested on: **Ubuntu 22.04, Ubuntu 24.04, Debian 12**
 
 ### Update standalone installation
 
+**Type directly (if already installed):**
+```bash
+update
+```
+
+**Via curl:**
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/misc/update.sh)"
 ```

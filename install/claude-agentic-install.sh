@@ -9,6 +9,17 @@
 #   - Called by ct/claude-agentic.sh inside a Proxmox LXC (FUNCTIONS_FILE_PATH is set)
 #   - Can also run standalone on any existing Debian/Ubuntu system or VPS
 
+# ─── Logging (both modes) ──────────────────────────────────────────────────────
+
+LOG_FILE="/var/log/claude-agentic-install.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "=== Install started: $(date) ==="
+
+# log_run: runs a command, shows nothing on screen but writes full output to log
+# Use instead of log_runso failures are always traceable
+log_run() { "$@" >>"$LOG_FILE" 2>&1; }
+
 # ─── Mode detection ────────────────────────────────────────────────────────────
 
 if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
@@ -41,19 +52,13 @@ else
   source /etc/os-release
   [[ "$ID" != "debian" && "$ID" != "ubuntu" ]] && msg_error "Requires Debian or Ubuntu (got: ${ID})"
 
-  STD=""
-
-  LOG_FILE="/var/log/claude-agentic-install.log"
-  exec > >(tee -a "$LOG_FILE") 2>&1
-  echo "=== Install started: $(date) ==="
-
   echo -e "\n ${BOLD}${BL}Claude Agentic — Standalone Installer${CL}"
   echo -e " ${YW}OS: ${ID} ${VERSION_ID}${CL}"
   echo -e " ${YW}Log: ${LOG_FILE}${CL}\n"
 
   msg_info "Updating system packages"
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+  log_run apt-get update
+  log_run env DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
   msg_ok "System updated"
 fi
 
@@ -62,10 +67,10 @@ APP="${APP:-Claude Agentic}"
 # ─── 1. Locale ──────────────────────────────────────────────────────────────────
 
 msg_info "Configuring locale"
-$STD apt-get install -y locales
+log_runapt-get install -y locales
 sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen
-$STD locale-gen en_US.UTF-8
-$STD update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+log_runlocale-gen en_US.UTF-8
+log_runupdate-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 msg_ok "Locale configured (en_US.UTF-8)"
@@ -73,7 +78,7 @@ msg_ok "Locale configured (en_US.UTF-8)"
 # ─── 2. Base dependencies ────────────────────────────────────────────────────────
 
 msg_info "Installing base dependencies"
-$STD apt-get install -y \
+log_runapt-get install -y \
   curl wget git build-essential make cmake pkg-config autoconf automake libtool \
   ca-certificates gnupg lsb-release apt-transport-https software-properties-common \
   libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev \
@@ -93,20 +98,20 @@ msg_ok "Installed base dependencies"
 # ─── 3. Node.js 22 LTS ───────────────────────────────────────────────────────────
 
 msg_info "Installing Node.js 22 LTS"
-$STD curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-$STD apt-get install -y nodejs
+log_runcurl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+log_runapt-get install -y nodejs
 msg_ok "Installed Node.js $(node --version)"
 
 msg_info "Installing global Node.js tools"
-$STD npm install -g typescript ts-node eslint prettier
+log_runnpm install -g typescript ts-node eslint prettier
 msg_ok "Installed TypeScript, ts-node, ESLint, Prettier"
 
 # ─── 4. Python 3 ─────────────────────────────────────────────────────────────────
 
 msg_info "Installing Python tools"
-$STD apt-get install -y python3 python3-pip python3-venv python3-dev
-$STD pip3 install --quiet --break-system-packages pipx uv 2>/dev/null || \
-  $STD pip3 install --quiet pipx uv 2>/dev/null || true
+log_runapt-get install -y python3 python3-pip python3-venv python3-dev
+log_runpip3 install --quiet --break-system-packages pipx uv 2>/dev/null || \
+  log_runpip3 install --quiet pipx uv 2>/dev/null || true
 msg_ok "Installed Python $(python3 --version | cut -d' ' -f2)"
 
 # ─── 5. Go (latest) ──────────────────────────────────────────────────────────────
@@ -114,9 +119,9 @@ msg_ok "Installed Python $(python3 --version | cut -d' ' -f2)"
 msg_info "Installing Go"
 GO_VERSION=$(curl -fsSL "https://go.dev/VERSION?m=text" | head -1)
 if [[ -n "$GO_VERSION" ]]; then
-  $STD curl -fsSL "https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+  log_runcurl -fsSL "https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
   rm -rf /usr/local/go
-  $STD tar -C /usr/local -xzf /tmp/go.tar.gz
+  log_runtar -C /usr/local -xzf /tmp/go.tar.gz
   rm -f /tmp/go.tar.gz
   cat > /etc/profile.d/go.sh <<'EOF'
 export PATH=$PATH:/usr/local/go/bin
@@ -131,7 +136,7 @@ fi
 # ─── 6. Rust ──────────────────────────────────────────────────────────────────────
 
 msg_info "Installing Rust"
-$STD curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+log_runcurl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
 [[ ! -f /usr/local/bin/cargo ]] && ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo 2>/dev/null || true
 [[ ! -f /usr/local/bin/rustc ]] && ln -sf "$HOME/.cargo/bin/rustc" /usr/local/bin/rustc 2>/dev/null || true
@@ -140,27 +145,27 @@ msg_ok "Installed Rust $(rustc --version 2>/dev/null | cut -d' ' -f2 || echo 'la
 # ─── 7. Docker + Compose plugin ───────────────────────────────────────────────────
 
 msg_info "Installing Docker"
-$STD curl -fsSL https://get.docker.com | sh
-$STD systemctl enable --now docker
-$STD apt-get install -y docker-compose-plugin
+log_runcurl -fsSL https://get.docker.com | sh
+log_runsystemctl enable --now docker
+log_runapt-get install -y docker-compose-plugin
 msg_ok "Installed Docker $(docker --version | cut -d' ' -f3 | tr -d ',') + Compose plugin"
 
 # ─── 8. GitHub CLI ────────────────────────────────────────────────────────────────
 
 msg_info "Installing GitHub CLI"
-$STD curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+log_runcurl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
   https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
-$STD apt-get update
-$STD apt-get install -y gh
+log_runapt-get update
+log_runapt-get install -y gh
 msg_ok "Installed GitHub CLI $(gh --version | head -1 | cut -d' ' -f3)"
 
 # ─── 9. code-server ───────────────────────────────────────────────────────────────
 
 msg_info "Installing code-server"
-$STD curl -fsSL https://code-server.dev/install.sh | sh
+log_runcurl -fsSL https://code-server.dev/install.sh | sh
 
 CS_PASSWORD=$(openssl rand -hex 16)
 mkdir -p /root/.config/code-server
@@ -177,7 +182,7 @@ msg_ok "Installed code-server (port 8443)"
 # ─── 10. Claude Code ──────────────────────────────────────────────────────────────
 
 msg_info "Installing Claude Code"
-$STD npm install -g @anthropic-ai/claude-code
+log_runnpm install -g @anthropic-ai/claude-code
 msg_ok "Installed Claude Code $(claude --version 2>/dev/null || echo 'latest')"
 
 msg_info "Configuring Claude Code"
@@ -312,7 +317,7 @@ msg_ok "Shell environment configured"
 msg_info "Configuring SSH"
 sed -i "s/^#*PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
 sed -i "s/^#*PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config
-$STD systemctl enable --now ssh
+log_runsystemctl enable --now ssh
 msg_ok "SSH configured"
 
 # ─── 15. Update command ───────────────────────────────────────────────────────────
@@ -394,8 +399,8 @@ msg_ok "Weekly auto-update scheduled"
 # ─── 16. Cleanup ──────────────────────────────────────────────────────────────────
 
 msg_info "Cleaning up"
-$STD apt-get autoremove -y
-$STD apt-get clean
+log_runapt-get autoremove -y
+log_runapt-get clean
 rm -rf /var/lib/apt/lists/*
 msg_ok "Cleaned up"
 
