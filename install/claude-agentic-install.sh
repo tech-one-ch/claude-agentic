@@ -67,6 +67,11 @@ fi
 
 APP="${APP:-Claude Agentic}"
 
+# ─── Configuration ─────────────────────────────────────────────────────────────
+# Default IDE when no input is given (timeout or non-interactive mode)
+# Options: codeserver | tunnel | both | none
+DEFAULT_IDE_CHOICE="both"
+
 # ─── IDE choice ────────────────────────────────────────────────────────────────
 # IDE_CHOICE: codeserver | tunnel | both | none
 # In community-scripts mode: set via environment variable before running
@@ -79,15 +84,16 @@ if [[ -z "${IDE_CHOICE:-}" ]]; then
     echo "  2) VS Code Tunnel — Microsoft relay (vscode.dev, no open port)"
     echo "  3) Both"
     echo "  4) None"
-    read -rt 60 -p "  Choice [1, default in 60s]: " _ide_input || true
-    case "${_ide_input:-1}" in
+    read -rt 60 -p "  Choice [default: ${DEFAULT_IDE_CHOICE}, 60s timeout]: " _ide_input || true
+    case "${_ide_input:-}" in
+      1) IDE_CHOICE="codeserver" ;;
       2) IDE_CHOICE="tunnel" ;;
       3) IDE_CHOICE="both" ;;
       4) IDE_CHOICE="none" ;;
-      *) IDE_CHOICE="both" ;;
+      *) IDE_CHOICE="$DEFAULT_IDE_CHOICE" ;;
     esac
   else
-    IDE_CHOICE="both"
+    IDE_CHOICE="$DEFAULT_IDE_CHOICE"
   fi
 fi
 
