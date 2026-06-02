@@ -127,8 +127,10 @@ claude-agentic/
 │   └── claude-agentic-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
 ├── misc/
 │   └── update.sh              # Standalone updater (curl-able)
-├── CHECK.md                   # Check script — usage, options, Supabase integration
-└── TESTING.md                 # Manual verification commands & debug guide
+├── checks/                   # Check script — usage, options, Supabase integration
+│   ├── check.sh
+│   ├── CHECK.md
+│   └── TESTING.md
 ```
 
 ---

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Claude Agentic — Installation check script
-# Usage: bash tests/check.sh [--export [file]] [--supabase]
-# Docs:  https://github.com/tech-one-ch/claude-agentic/blob/main/CHECK.md
+# Usage: bash checks/check.sh [--export [file]] [--supabase]
+# Docs:  https://github.com/tech-one-ch/claude-agentic/blob/main/checks/CHECK.md
 
 set -uo pipefail
 
@@ -197,7 +197,7 @@ send_to_supabase() {
     FOR INSERT WITH CHECK (true);
 SQL
     echo -e "${CL}"
-    echo -e "  Then re-run: ${BOLD}bash tests/check.sh --supabase${CL}"
+    echo -e "  Then re-run: ${BOLD}bash checks/check.sh --supabase${CL}"
 
   else
     echo -e "  ${RD}✖${CL} Error (HTTP ${http_code}): ${body}"

@@ -8,19 +8,19 @@ Run it inside the LXC or VM after installation.
 ## Run from `main` (stable)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh)
 ```
 
 ## Run from `dev` (testing)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/tests/check.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh)
 ```
 
 ## If the repo is cloned locally
 
 ```bash
-bash tests/check.sh
+bash checks/check.sh
 ```
 
 ---
@@ -37,16 +37,16 @@ Examples:
 
 ```bash
 # Export to auto-named file
-bash tests/check.sh --export
+bash checks/check.sh --export
 
 # Export to specific file
-bash tests/check.sh --export /tmp/results.txt
+bash checks/check.sh --export /tmp/results.txt
 
 # Send to Supabase
-bash tests/check.sh --supabase
+bash checks/check.sh --supabase
 
 # Export + Supabase
-bash tests/check.sh --export --supabase
+bash checks/check.sh --export --supabase
 ```
 
 ---
@@ -61,7 +61,7 @@ Two ways to provide credentials:
 
 **Option A — prompted at runtime** (key hidden, not shown in terminal):
 ```bash
-bash tests/check.sh --supabase
+bash checks/check.sh --supabase
 # → prompts for URL then key (input hidden like a password)
 ```
 
@@ -69,7 +69,7 @@ bash tests/check.sh --supabase
 ```bash
 export SUPABASE_URL="https://abc123.supabase.co"
 export SUPABASE_KEY="your-service-role-key"
-bash tests/check.sh --supabase
+bash checks/check.sh --supabase
 ```
 
 ### Where to find your credentials

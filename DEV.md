@@ -6,9 +6,9 @@
 > For production use, refer to the [stable README](https://github.com/tech-one-ch/claude-agentic/blob/main/README.md) on `main`.
 
 > [!TIP]
-> After installing from this branch, verify the installation — see **[CHECK.md](CHECK.md)** for all options (export, Supabase, manual checks).
+> After installing from this branch, verify the installation — see **[CHECK.md](checks/CHECK.md)** for all options (export, Supabase, manual checks).
 > ```bash
-> bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/tests/check.sh)
+> bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh)
 > ```
 
 ---
@@ -181,8 +181,10 @@ claude-agentic/
 │   └── claude-agentic-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
 ├── misc/
 │   └── update.sh                  # Standalone updater (curl-able)
-├── CHECK.md                       # Check script — usage, options, Supabase integration
-└── TESTING.md                     # Manual verification commands & debug guide
+├── checks/
+│   ├── check.sh
+│   ├── CHECK.md
+│   └── TESTING.md
 ```
 
 ---
