@@ -216,11 +216,16 @@ fi
 
 if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
   msg_info "Installing VS Code Tunnel CLI (~65 MB, may take a few minutes)"
-  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
-    -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1
-  tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
-  rm -f /tmp/vscode-cli.tar.gz
-  msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
+  if curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
+      -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1 \
+    && tar -tzf /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1; then
+    tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
+    rm -f /tmp/vscode-cli.tar.gz
+    msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
+  else
+    rm -f /tmp/vscode-cli.tar.gz
+    msg_warn "VS Code Tunnel download failed — install it manually later with: curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' -o /tmp/vscode-cli.tar.gz && tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/"
+  fi
 fi
 
 # ─── 10. Claude Code ──────────────────────────────────────────────────────────────
