@@ -2,20 +2,32 @@
 
 ## Quick check (recommended)
 
-Run the check script inside the LXC or VM — checks all components at once and shows a summary:
+Run the check script inside the LXC or VM — checks all components at once and shows a summary.
+
+### From `main` (stable)
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh)
 ```
 
-With export to file:
+### From `dev` (testing)
+
 ```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/tests/check.sh)
+```
+
+### With export to file
+
+```bash
+# Auto-named file
 bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh) --export
-# or to a specific file:
+
+# Specific file
 bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/tests/check.sh) --export /tmp/results.txt
 ```
 
-If the repo is cloned locally:
+### If the repo is cloned locally
+
 ```bash
 bash tests/check.sh
 bash tests/check.sh --export

@@ -5,6 +5,13 @@
 > Scripts here are not verified and may be broken or incomplete.
 > For production use, refer to the [stable README](https://github.com/tech-one-ch/claude-agentic/blob/main/README.md) on `main`.
 
+> [!TIP]
+> After installing from this branch, verify the installation using the check script:
+> ```bash
+> bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/tests/check.sh)
+> ```
+> See [TESTING.md](TESTING.md) for all options (export, manual checks).
+
 ---
 
 Automated installer for a full **Claude Code** development environment.
