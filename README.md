@@ -84,14 +84,20 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
    - Password is shown in the terminal at the end of installation
    - Also visible at login: `cat /etc/motd`
 
-2. **Start Claude Code** from the Code Server terminal:
+2. **Activate VS Code Tunnel** (first time only, inside the container):
+   ```bash
+   code tunnel
+   ```
+   Follow the link to authenticate with your GitHub or Microsoft account. After that, the tunnel is accessible at [vscode.dev](https://vscode.dev) or via the VS Code desktop app (Remote Tunnels).
+
+3. **Start Claude Code** from the terminal:
    ```bash
    cd /project
    claude
    ```
    At first launch, Claude shows a login link — open it in your browser to authenticate with your Anthropic account (no API key needed).
 
-3. **Authenticate GitHub CLI** (for PR automation):
+4. **Authenticate GitHub CLI** (for PR automation):
    ```bash
    gh auth login
    ```

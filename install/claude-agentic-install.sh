@@ -284,7 +284,7 @@ cat > /project/CLAUDE.md <<'EOF'
 - **GitHub**: `gh` CLI pre-installed — use it for PRs, issues, releases
 - **Search**: ripgrep (`rg`), fd, fzf, bat, jq, yq
 - **Databases**: PostgreSQL client, Redis CLI, SQLite3
-- **Editor**: code-server on port 8443 (VS Code in browser)
+- **Editor**: code-server on port 8443 (VS Code in browser) — run 'code tunnel' once to also enable VS Code Tunnel (vscode.dev)
 
 ## Permissions
 All tools pre-approved — no prompts for Bash, Read, Write, Edit, MultiEdit,
