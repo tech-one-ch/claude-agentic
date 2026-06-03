@@ -117,20 +117,51 @@ log_run apt-get install -y \
   libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev \
   libsqlite3-dev libncursesw5-dev libgdbm-dev liblzma-dev libxml2-dev libxslt-dev \
   tmux screen htop nano vim jq yq unzip zip tar openssl \
-  ripgrep fd-find fzf bat \
+  ripgrep fzf \
   net-tools iproute2 dnsutils openssh-server \
   postgresql-client sqlite3 redis-tools \
   cron logrotate
 msg_ok "Installed base dependencies"
 
-# fd and bat: create /usr/local/bin symlinks if the command isn't already in PATH
-if ! command -v fd &>/dev/null; then
-  _b=$(command -v fdfind 2>/dev/null || true)
-  [[ -n "$_b" ]] && ln -sf "$_b" /usr/local/bin/fd
+# fd: Ubuntu's fd-find package installs a broken symlink. Install the static binary directly.
+# Version detection via redirect (not the GitHub API — avoids the 60 req/h rate limit).
+msg_info "Installing fd"
+_fd_ver=$(curl -fsL -o /dev/null -w '%{url_effective}' \
+  "https://github.com/sharkdp/fd/releases/latest" 2>/dev/null \
+  | sed 's|.*/tag/||' || true)
+if [[ -n "$_fd_ver" ]]; then
+  curl -fsSL "https://github.com/sharkdp/fd/releases/download/${_fd_ver}/fd-${_fd_ver}-x86_64-unknown-linux-musl.tar.gz" \
+    -o /tmp/_fd.tar.gz
+  mkdir -p /tmp/_fd_tmp
+  tar -xzf /tmp/_fd.tar.gz -C /tmp/_fd_tmp --strip-components=1
+  mv /tmp/_fd_tmp/fd /usr/local/bin/fd
+  chmod 0755 /usr/local/bin/fd
+  chown 0:0 /usr/local/bin/fd
+  ln -sf /usr/local/bin/fd /usr/bin/fd
+  rm -rf /tmp/_fd.tar.gz /tmp/_fd_tmp
+  msg_ok "Installed fd ${_fd_ver}"
+else
+  msg_warn "Could not resolve fd version (network issue?) — fd not installed"
 fi
-if ! command -v bat &>/dev/null; then
-  _b=$(command -v batcat 2>/dev/null || true)
-  [[ -n "$_b" ]] && ln -sf "$_b" /usr/local/bin/bat
+
+# bat: Ubuntu apt installs as 'batcat' (name conflict). Install the static binary directly.
+msg_info "Installing bat"
+_bat_ver=$(curl -fsL -o /dev/null -w '%{url_effective}' \
+  "https://github.com/sharkdp/bat/releases/latest" 2>/dev/null \
+  | sed 's|.*/tag/||' || true)
+if [[ -n "$_bat_ver" ]]; then
+  curl -fsSL "https://github.com/sharkdp/bat/releases/download/${_bat_ver}/bat-${_bat_ver}-x86_64-unknown-linux-musl.tar.gz" \
+    -o /tmp/_bat.tar.gz
+  mkdir -p /tmp/_bat_tmp
+  tar -xzf /tmp/_bat.tar.gz -C /tmp/_bat_tmp --strip-components=1
+  mv /tmp/_bat_tmp/bat /usr/local/bin/bat
+  chmod 0755 /usr/local/bin/bat
+  chown 0:0 /usr/local/bin/bat
+  ln -sf /usr/local/bin/bat /usr/bin/bat
+  rm -rf /tmp/_bat.tar.gz /tmp/_bat_tmp
+  msg_ok "Installed bat ${_bat_ver}"
+else
+  msg_warn "Could not resolve bat version (network issue?) — bat not installed"
 fi
 
 # ─── 3. Node.js 22 LTS ───────────────────────────────────────────────────────────
@@ -163,6 +194,9 @@ if [[ -n "$GO_VERSION" ]]; then
   rm -rf /usr/local/go
   log_run tar -C /usr/local -xzf /tmp/go.tar.gz
   rm -f /tmp/go.tar.gz
+  # Symlinks in /usr/local/bin so go is available in all shells (not just login shells)
+  ln -sf /usr/local/go/bin/go    /usr/local/bin/go
+  ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
   cat > /etc/profile.d/go.sh <<'EOF'
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
@@ -229,15 +263,42 @@ fi
 
 if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
   msg_info "Installing VS Code Tunnel CLI (~65 MB, may take a few minutes)"
-  if curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
+  _vscode_ok=0
+  if curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
       -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1 \
     && tar -tzf /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1; then
-    tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
-    rm -f /tmp/vscode-cli.tar.gz
-    msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
+    # Extract to a temp dir then locate the 'code' binary regardless of archive structure
+    mkdir -p /tmp/_vscode_tmp
+    tar -xzf /tmp/vscode-cli.tar.gz -C /tmp/_vscode_tmp/ >>"$LOG_FILE" 2>&1 || true
+    _code_bin=$(find /tmp/_vscode_tmp -name code -type f 2>/dev/null | head -1)
+    if [[ -n "$_code_bin" ]]; then
+      mv "$_code_bin" /usr/local/bin/code
+      chmod 0755 /usr/local/bin/code
+      chown 0:0 /usr/local/bin/code
+      ln -sf /usr/local/bin/code /usr/bin/code
+      # Verify the binary actually works — log result for diagnostics
+      echo "=== VS Code CLI smoke-test ===" >>"$LOG_FILE"
+      /usr/local/bin/code --version >>"$LOG_FILE" 2>&1 && _vscode_ok=1 || {
+        echo "code --version exit $? — binary may need unprivileged_userns_clone" >>"$LOG_FILE"
+        # Some kernels disable unprivileged user namespaces; enable it so VS Code tunnel can sandbox
+        if [[ -f /proc/sys/kernel/unprivileged_userns_clone ]]; then
+          echo 1 > /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || true
+          sysctl -w kernel.unprivileged_userns_clone=1 >>"$LOG_FILE" 2>&1 || true
+          # Persist across reboots
+          echo "kernel.unprivileged_userns_clone=1" > /etc/sysctl.d/99-vscode-tunnel.conf
+        fi
+        /usr/local/bin/code --version >>"$LOG_FILE" 2>&1 && _vscode_ok=1 || \
+          echo "code --version still failed after sysctl fix — exit $?" >>"$LOG_FILE"
+      }
+    fi
+    rm -rf /tmp/vscode-cli.tar.gz /tmp/_vscode_tmp
   else
     rm -f /tmp/vscode-cli.tar.gz
-    msg_warn "VS Code Tunnel download failed — install it manually later with: curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' -o /tmp/vscode-cli.tar.gz && tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/"
+  fi
+  if [[ $_vscode_ok -eq 1 ]]; then
+    msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
+  else
+    msg_warn "VS Code Tunnel install failed — check $LOG_FILE for details"
   fi
 fi
 
@@ -246,6 +307,9 @@ fi
 msg_info "Installing Claude Code"
 curl -fsSL https://claude.ai/install.sh | bash >>"$LOG_FILE" 2>&1 \
   || log_run npm install -g @anthropic-ai/claude-code
+# The official installer puts the binary in ~/.local/bin — export immediately so it's
+# available for the rest of this script and not just in future login shells.
+export PATH="$HOME/.local/bin:$PATH"
 msg_ok "Installed Claude Code $(claude --version 2>/dev/null || echo 'latest')"
 
 msg_info "Configuring Claude Code"
@@ -434,10 +498,14 @@ fi
 
 if command -v code &>/dev/null; then
   msg_info "Updating VS Code Tunnel (CLI)"
-  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
-    -o /tmp/vscode-cli.tar.gz
-  tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
-  rm -f /tmp/vscode-cli.tar.gz
+  if curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
+      -o /tmp/vscode-cli.tar.gz 2>/dev/null; then
+    mkdir -p /tmp/_vscode_tmp
+    tar -xzf /tmp/vscode-cli.tar.gz -C /tmp/_vscode_tmp/ 2>/dev/null || true
+    _code_bin=$(find /tmp/_vscode_tmp -name code -type f 2>/dev/null | head -1)
+    [[ -n "$_code_bin" ]] && mv "$_code_bin" /usr/local/bin/code && chmod +x /usr/local/bin/code
+    rm -rf /tmp/vscode-cli.tar.gz /tmp/_vscode_tmp
+  fi
   msg_ok "VS Code Tunnel updated"
 fi
 
