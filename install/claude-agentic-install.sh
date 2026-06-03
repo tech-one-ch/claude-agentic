@@ -163,6 +163,9 @@ if [[ -n "$GO_VERSION" ]]; then
   rm -rf /usr/local/go
   log_run tar -C /usr/local -xzf /tmp/go.tar.gz
   rm -f /tmp/go.tar.gz
+  # Symlinks in /usr/local/bin so go is available in all shells (not just login shells)
+  ln -sf /usr/local/go/bin/go    /usr/local/bin/go
+  ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
   cat > /etc/profile.d/go.sh <<'EOF'
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
@@ -229,7 +232,7 @@ fi
 
 if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
   msg_info "Installing VS Code Tunnel CLI (~65 MB, may take a few minutes)"
-  if curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
+  if curl -fLk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
       -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1 \
     && tar -tzf /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1; then
     tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
@@ -434,7 +437,7 @@ fi
 
 if command -v code &>/dev/null; then
   msg_info "Updating VS Code Tunnel (CLI)"
-  curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
+  curl -fLk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
     -o /tmp/vscode-cli.tar.gz
   tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
   rm -f /tmp/vscode-cli.tar.gz
