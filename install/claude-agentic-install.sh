@@ -123,22 +123,15 @@ log_run apt-get install -y \
   cron logrotate
 msg_ok "Installed base dependencies"
 
-# fd and bat: create /usr/local/bin symlinks if the command isn't already in PATH
-if ! command -v fd &>/dev/null; then
-  _b=$(command -v fdfind 2>/dev/null || true)
-  [[ -n "$_b" ]] && ln -sf "$_b" /usr/local/bin/fd
-fi
-if ! command -v bat &>/dev/null; then
-  _b=$(command -v batcat 2>/dev/null || true)
-  [[ -n "$_b" ]] && ln -sf "$_b" /usr/local/bin/bat
-fi
+# fd and bat symlinks (Debian/Ubuntu ship them as fdfind / batcat)
+[[ ! -f /usr/local/bin/fd  ]] && [[ -f /usr/bin/fdfind  ]] && ln -s /usr/bin/fdfind  /usr/local/bin/fd
+[[ ! -f /usr/local/bin/bat ]] && [[ -f /usr/bin/batcat  ]] && ln -s /usr/bin/batcat  /usr/local/bin/bat
+[[ ! -f /usr/local/bin/bat ]] && [[ -f /usr/bin/bat     ]] && ln -s /usr/bin/bat     /usr/local/bin/bat
 
 # ─── 3. Node.js 22 LTS ───────────────────────────────────────────────────────────
 
 msg_info "Installing Node.js 22 LTS"
-curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/_nodesource_setup.sh
-log_run bash /tmp/_nodesource_setup.sh
-rm -f /tmp/_nodesource_setup.sh
+log_run curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 log_run apt-get install -y nodejs
 msg_ok "Installed Node.js $(node --version)"
 
@@ -176,9 +169,7 @@ fi
 # ─── 6. Rust ──────────────────────────────────────────────────────────────────────
 
 msg_info "Installing Rust"
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/_rustup_init.sh
-log_run sh /tmp/_rustup_init.sh -y --no-modify-path
-rm -f /tmp/_rustup_init.sh
+log_run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
 [[ ! -f /usr/local/bin/cargo ]] && ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo 2>/dev/null || true
 [[ ! -f /usr/local/bin/rustc ]] && ln -sf "$HOME/.cargo/bin/rustc" /usr/local/bin/rustc 2>/dev/null || true
@@ -187,9 +178,7 @@ msg_ok "Installed Rust $(rustc --version 2>/dev/null | cut -d' ' -f2 || echo 'la
 # ─── 7. Docker + Compose plugin ───────────────────────────────────────────────────
 
 msg_info "Installing Docker"
-curl -fsSL https://get.docker.com -o /tmp/_docker_install.sh
-log_run sh /tmp/_docker_install.sh
-rm -f /tmp/_docker_install.sh
+log_run curl -fsSL https://get.docker.com | sh
 log_run systemctl enable --now docker
 log_run apt-get install -y docker-compose-plugin
 msg_ok "Installed Docker $(docker --version | cut -d' ' -f3 | tr -d ',') + Compose plugin"
@@ -197,8 +186,8 @@ msg_ok "Installed Docker $(docker --version | cut -d' ' -f3 | tr -d ',') + Compo
 # ─── 8. GitHub CLI ────────────────────────────────────────────────────────────────
 
 msg_info "Installing GitHub CLI"
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-  -o /usr/share/keyrings/githubcli-archive-keyring.gpg
+log_run curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
   https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
@@ -212,9 +201,7 @@ CS_PASSWORD=""
 
 if [[ "$IDE_CHOICE" == "codeserver" || "$IDE_CHOICE" == "both" ]]; then
   msg_info "Installing code-server"
-  curl -fsSL https://code-server.dev/install.sh -o /tmp/_codeserver_install.sh
-  log_run sh /tmp/_codeserver_install.sh
-  rm -f /tmp/_codeserver_install.sh
+  log_run curl -fsSL https://code-server.dev/install.sh | sh
   CS_PASSWORD=$(openssl rand -hex 16)
   mkdir -p /root/.config/code-server
   cat > /root/.config/code-server/config.yaml <<EOF

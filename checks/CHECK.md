@@ -71,7 +71,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/m
 **Option B — environment variables** (for automation):
 ```bash
 export SUPABASE_URL="https://abc123.supabase.co"
-export SUPABASE_KEY="your-publishable-or-anon-key"
+export SUPABASE_KEY="your-anon-key"
 bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --supabase
 ```
 
@@ -94,16 +94,9 @@ In your [Supabase dashboard](https://supabase.com/dashboard):
 1. Select your project
 2. Go to **Project Settings → API**
 3. **Project URL** → use as `SUPABASE_URL`
-4. For the key → use as `SUPABASE_KEY`:
+4. **anon / public** key (also called `publishable` in new projects) → use as `SUPABASE_KEY`
 
-| Your project | Section in dashboard | Key to use |
-|---|---|---|
-| Recent (new UI) | **Publishable and secret API keys** | `publishable` key |
-| Older project | **Legacy anon, service_role API keys** | `anon` key |
-
-Both map to the same PostgreSQL `anon` role — the RLS policy below works with either.
-
-> Never use the `secret` / `service_role` key in scripts — it bypasses all security.
+> Never use the `service_role` / `secret` key in scripts — it bypasses all security.
 
 ### Create the table (first time only)
 

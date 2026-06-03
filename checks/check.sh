@@ -60,10 +60,7 @@ FAIL_COUNT=0
 WARN_COUNT=0
 SKIP_COUNT=0
 declare -a LINES=()
-# Parallel arrays for JSON — avoids escaping issues, jq handles encoding
-declare -a JSON_LABELS=()
-declare -a JSON_STATUSES=()
-declare -a JSON_DETAILS=()
+declare -a JSON_CHECKS=()
 
 record() {
   local label="$1" status="$2" detail="$3"
@@ -75,9 +72,8 @@ record() {
     skip) lbl="$LBL_SKIP"; SKIP_COUNT=$((SKIP_COUNT+1)) ;;
   esac
   LINES+=("  ${lbl}  ${BOLD}${label}${CL}  ${DIM}${detail}${CL}")
-  JSON_LABELS+=("$label")
-  JSON_STATUSES+=("$status")
-  JSON_DETAILS+=("$detail")
+  local el="${label//\"/\\\"}"; local ed="${detail//\"/\\\"}"
+  JSON_CHECKS+=("{\"label\":\"${el}\",\"status\":\"${status}\",\"detail\":\"${ed}\"}")
 }
 
 flush() {
@@ -143,51 +139,33 @@ send_to_supabase() {
   if [[ -n "$supa_url" ]]; then
     echo -e "  URL: ${DIM}${supa_url}${CL}"
   else
-    echo -ne "  Project URL (e.g. https://abc123.supabase.co, without /rest/v1): "
+    echo -ne "  URL (e.g. https://abc123.supabase.co): "
     read -r supa_url
   fi
 
   if [[ -n "$supa_key" ]]; then
     echo -e "  Key: ${DIM}[provided]${CL}"
   else
-    echo -ne "  Publishable key (or legacy anon key): "
+    echo -ne "  Anon/publishable key: "
     read -rsp "" supa_key
     echo ""
   fi
 
-  # Sanitize URL: strip whitespace, trailing slash, and /rest/v1 suffix if pasted from docs
-  supa_url="${supa_url%% *}"
-  supa_url="${supa_url%%/rest/v1*}"
-  supa_url="${supa_url%/}"
-
-  # Build JSON using jq (handles all escaping correctly)
-  local details_json payload
-
-  if command -v jq &>/dev/null; then
-    details_json=$(
-      for i in "${!JSON_LABELS[@]}"; do
-        jq -n \
-          --arg label   "${JSON_LABELS[$i]}" \
-          --arg status  "${JSON_STATUSES[$i]}" \
-          --arg detail  "${JSON_DETAILS[$i]}" \
-          '{label: $label, status: $status, detail: $detail}'
-      done | jq -s '.'
-    )
-    payload=$(jq -n \
-      --arg   hostname   "$HOSTNAME_VAL" \
-      --arg   env_type   "$ENV_TYPE" \
-      --arg   os_name    "$OS_NAME" \
-      --arg   ip         "${IP:-}" \
-      --argjson pass_count  "$PASS_COUNT" \
-      --argjson fail_count  "$FAIL_COUNT" \
-      --argjson warn_count  "$WARN_COUNT" \
-      --argjson skip_count  "$SKIP_COUNT" \
-      --argjson details     "$details_json" \
-      '{hostname:$hostname,env_type:$env_type,os_name:$os_name,ip:$ip,pass_count:$pass_count,fail_count:$fail_count,warn_count:$warn_count,skip_count:$skip_count,details:$details}')
+  # Build JSON
+  local details
+  if [[ ${#JSON_CHECKS[@]} -gt 0 ]]; then
+    details=$(printf '%s,' "${JSON_CHECKS[@]}")
+    details="[${details%,}]"
   else
-    echo -e "  ${YW}⚠${CL} jq not found — install it and retry for reliable JSON encoding"
-    return
+    details="[]"
   fi
+
+  local payload
+  payload=$(printf \
+    '{"hostname":"%s","env_type":"%s","os_name":"%s","ip":"%s","pass_count":%d,"fail_count":%d,"warn_count":%d,"skip_count":%d,"details":%s}' \
+    "$HOSTNAME_VAL" "$ENV_TYPE" "$OS_NAME" "${IP:-}" \
+    "$PASS_COUNT" "$FAIL_COUNT" "$WARN_COUNT" "$SKIP_COUNT" \
+    "$details")
 
   local response http_code
   response=$(curl -s -o /tmp/_supa_resp.txt -w "%{http_code}" \
@@ -195,7 +173,6 @@ send_to_supabase() {
     -H "apikey: ${supa_key}" \
     -H "Authorization: Bearer ${supa_key}" \
     -H "Content-Type: application/json" \
-    -H "Content-Profile: public" \
     -H "Prefer: return=minimal" \
     -d "$payload" 2>/dev/null)
   http_code="$response"
@@ -244,8 +221,7 @@ SQL
 ENV_TYPE=$(detect_env)
 OS_NAME=$(grep -oP '(?<=^PRETTY_NAME=").*(?=")' /etc/os-release 2>/dev/null || echo "Unknown OS")
 HOSTNAME_VAL=$(hostname)
-IP=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
-IP="${IP:-$(hostname -I | tr -s ' ' '\n' | grep -Eo '([0-9]+\.){3}[0-9]+' | grep -v '^127\.' | grep -v '^172\.' | head -1)}"
+IP=$(hostname -I | tr -s ' \n' '\n' | grep -Eo '([0-9]+\.){3}[0-9]+' | tail -1)
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
 run_checks() {
