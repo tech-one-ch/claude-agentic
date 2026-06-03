@@ -123,15 +123,10 @@ log_run apt-get install -y \
   cron logrotate
 msg_ok "Installed base dependencies"
 
-# fd and bat: create /usr/local/bin symlinks if the command isn't already in PATH
-if ! command -v fd &>/dev/null; then
-  _b=$(command -v fdfind 2>/dev/null || true)
-  [[ -n "$_b" ]] && ln -sf "$_b" /usr/local/bin/fd
-fi
-if ! command -v bat &>/dev/null; then
-  _b=$(command -v batcat 2>/dev/null || true)
-  [[ -n "$_b" ]] && ln -sf "$_b" /usr/local/bin/bat
-fi
+# fd and bat: check file paths directly (not via PATH-dependent command -v)
+[[ -x /usr/bin/fdfind ]] && ln -sf /usr/bin/fdfind /usr/local/bin/fd
+[[ -x /usr/bin/batcat ]] && ln -sf /usr/bin/batcat /usr/local/bin/bat
+[[ -x /usr/bin/bat    ]] && [[ ! -L /usr/local/bin/bat ]] && ln -sf /usr/bin/bat /usr/local/bin/bat
 
 # ─── 3. Node.js 22 LTS ───────────────────────────────────────────────────────────
 
