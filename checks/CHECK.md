@@ -17,12 +17,6 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/m
 bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh)
 ```
 
-## If the repo is cloned locally
-
-```bash
-bash checks/check.sh
-```
-
 ---
 
 ## Options
@@ -31,22 +25,29 @@ bash checks/check.sh
 |---|---|
 | `--export` | Save results to an auto-named file (`check-results-YYYYMMDD-HHMMSS.txt`) |
 | `--export <file>` | Save results to a specific file |
-| `--supabase` | Send results to Supabase (prompts for credentials) |
+| `--supabase` | Send results to Supabase (prompts for missing credentials) |
+| `--supabase-url <url>` | Set Supabase project URL directly |
+| `--supabase-key <key>` | Set Supabase anon key directly ⚠️ see note below |
 
-Examples:
+### Examples
 
 ```bash
 # Export to auto-named file
-bash checks/check.sh --export
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --export
 
 # Export to specific file
-bash checks/check.sh --export /tmp/results.txt
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --export /tmp/results.txt
 
-# Send to Supabase
-bash checks/check.sh --supabase
+# Send to Supabase (interactive prompt)
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --supabase
+
+# Send to Supabase with URL pre-filled (key prompted)
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+  --supabase-url https://abc123.supabase.co
 
 # Export + Supabase
-bash checks/check.sh --export --supabase
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+  --export --supabase
 ```
 
 ---
@@ -55,22 +56,35 @@ bash checks/check.sh --export --supabase
 
 Results (summary + per-check details) can be sent to a Supabase table.
 
-### Credentials
+### Credentials — priority order
 
-The script uses the **anon/publishable key** (not the service_role key).
-This key only has INSERT rights on this specific table — safe to use in scripts.
+The script resolves credentials in this order:
+1. **CLI flags** (`--supabase-url`, `--supabase-key`)
+2. **Environment variables** (`SUPABASE_URL`, `SUPABASE_KEY`)
+3. **Interactive prompt** (URL visible, key hidden like a password)
 
-**Option A — prompted at runtime** (key hidden, not shown in terminal):
+**Option A — interactive prompt** (recommended, key never visible):
 ```bash
-bash checks/check.sh --supabase
-# → prompts for URL then anon key (input hidden like a password)
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --supabase
 ```
 
 **Option B — environment variables** (for automation):
 ```bash
 export SUPABASE_URL="https://abc123.supabase.co"
 export SUPABASE_KEY="your-anon-key"
-bash checks/check.sh --supabase
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --supabase
+```
+
+**Option C — CLI flags** (URL only recommended, key via flag is visible in bash history):
+```bash
+# URL only — key will be prompted (hidden)
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+  --supabase-url https://abc123.supabase.co
+
+# URL + key — convenient but key appears in bash history ⚠️
+bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+  --supabase-url https://abc123.supabase.co \
+  --supabase-key your-anon-key
 ```
 
 ### Where to find your credentials

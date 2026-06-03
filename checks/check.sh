@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Agentic — Installation check script
-# Usage: bash checks/check.sh [--export [file]] [--supabase]
+# Usage: bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) [options]
 # Docs:  https://github.com/tech-one-ch/claude-agentic/blob/main/checks/CHECK.md
 
 set -uo pipefail
@@ -21,9 +21,12 @@ LBL_WARN="${YW}⚠ WARN${CL}"
 LBL_SKIP="${DIM}– SKIP${CL}"
 
 # ─── Flag parsing ──────────────────────────────────────────────────────────────
+# Priority: CLI flags > env vars > interactive prompt
 
 EXPORT_FILE=""
 USE_SUPABASE=0
+CLI_SUPABASE_URL=""
+CLI_SUPABASE_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -37,6 +40,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --supabase)
       USE_SUPABASE=1; shift
+      ;;
+    --supabase-url)
+      USE_SUPABASE=1; shift
+      CLI_SUPABASE_URL="${1:-}"; shift
+      ;;
+    --supabase-key)
+      USE_SUPABASE=1; shift
+      CLI_SUPABASE_KEY="${1:-}"; shift
       ;;
     *) shift ;;
   esac
@@ -118,24 +129,26 @@ detect_env() {
 # ─── Supabase ──────────────────────────────────────────────────────────────────
 
 send_to_supabase() {
-  local supa_url="${SUPABASE_URL:-}" supa_key="${SUPABASE_KEY:-}"
+  # Priority: CLI flag > env var > interactive prompt
+  local supa_url="${CLI_SUPABASE_URL:-${SUPABASE_URL:-}}"
+  local supa_key="${CLI_SUPABASE_KEY:-${SUPABASE_KEY:-}}"
 
   echo ""
   echo -e "  ${BOLD}${BL}Supabase${CL}"
 
-  if [[ -z "$supa_url" ]]; then
+  if [[ -n "$supa_url" ]]; then
+    echo -e "  URL: ${DIM}${supa_url}${CL}"
+  else
     echo -ne "  URL (e.g. https://abc123.supabase.co): "
     read -r supa_url
-  else
-    echo -e "  URL: ${DIM}${supa_url}${CL}"
   fi
 
-  if [[ -z "$supa_key" ]]; then
+  if [[ -n "$supa_key" ]]; then
+    echo -e "  Key: ${DIM}[provided]${CL}"
+  else
     echo -ne "  Anon/publishable key: "
     read -rsp "" supa_key
     echo ""
-  else
-    echo -e "  Key: ${DIM}[from env]${CL}"
   fi
 
   # Build JSON
