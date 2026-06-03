@@ -131,7 +131,7 @@ send_to_supabase() {
   fi
 
   if [[ -z "$supa_key" ]]; then
-    echo -ne "  Service role key: "
+    echo -ne "  Anon/publishable key: "
     read -rsp "" supa_key
     echo ""
   else
@@ -191,10 +191,9 @@ send_to_supabase() {
     details     jsonb
   );
 
-  -- Allow inserts with the service_role key (RLS off or policy below)
   ALTER TABLE claude_agentic_checks ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "service_role insert" ON claude_agentic_checks
-    FOR INSERT WITH CHECK (true);
+  CREATE POLICY "anon insert only" ON claude_agentic_checks
+    FOR INSERT TO anon WITH CHECK (true);
 SQL
     echo -e "${CL}"
     echo -e "  Then re-run: ${BOLD}bash checks/check.sh --supabase${CL}"

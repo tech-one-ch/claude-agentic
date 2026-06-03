@@ -57,18 +57,19 @@ Results (summary + per-check details) can be sent to a Supabase table.
 
 ### Credentials
 
-Two ways to provide credentials:
+The script uses the **anon/publishable key** (not the service_role key).
+This key only has INSERT rights on this specific table — safe to use in scripts.
 
 **Option A — prompted at runtime** (key hidden, not shown in terminal):
 ```bash
 bash checks/check.sh --supabase
-# → prompts for URL then key (input hidden like a password)
+# → prompts for URL then anon key (input hidden like a password)
 ```
 
 **Option B — environment variables** (for automation):
 ```bash
 export SUPABASE_URL="https://abc123.supabase.co"
-export SUPABASE_KEY="your-service-role-key"
+export SUPABASE_KEY="your-anon-key"
 bash checks/check.sh --supabase
 ```
 
@@ -79,7 +80,9 @@ In your [Supabase dashboard](https://supabase.com/dashboard):
 1. Select your project
 2. Go to **Project Settings → API**
 3. **Project URL** → use as `SUPABASE_URL`
-4. **service_role** secret key → use as `SUPABASE_KEY` (never the anon key for this)
+4. **anon / public** key (also called `publishable` in new projects) → use as `SUPABASE_KEY`
+
+> Never use the `service_role` / `secret` key in scripts — it bypasses all security.
 
 ### Create the table (first time only)
 
@@ -101,10 +104,10 @@ CREATE TABLE IF NOT EXISTS claude_agentic_checks (
   details     jsonb
 );
 
--- Allow inserts with the service_role key
+-- Enable RLS and allow INSERT only for the anon role
 ALTER TABLE claude_agentic_checks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "service_role insert" ON claude_agentic_checks
-  FOR INSERT WITH CHECK (true);
+CREATE POLICY "anon insert only" ON claude_agentic_checks
+  FOR INSERT TO anon WITH CHECK (true);
 ```
 
 ### Data sent
