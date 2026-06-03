@@ -146,7 +146,7 @@ send_to_supabase() {
   if [[ -n "$supa_key" ]]; then
     echo -e "  Key: ${DIM}[provided]${CL}"
   else
-    echo -ne "  Anon/publishable key: "
+    echo -ne "  Publishable key (or legacy anon key): "
     read -rsp "" supa_key
     echo ""
   fi
