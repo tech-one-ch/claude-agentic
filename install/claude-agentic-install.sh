@@ -117,14 +117,27 @@ log_run apt-get install -y \
   libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev \
   libsqlite3-dev libncursesw5-dev libgdbm-dev liblzma-dev libxml2-dev libxslt-dev \
   tmux screen htop nano vim jq yq unzip zip tar openssl \
-  ripgrep fd-find fzf bat \
+  ripgrep fzf bat \
   net-tools iproute2 dnsutils openssh-server \
   postgresql-client sqlite3 redis-tools \
   cron logrotate
 msg_ok "Installed base dependencies"
 
-# fd and bat: check file paths directly (not via PATH-dependent command -v)
-[[ -x /usr/bin/fdfind ]] && ln -sf /usr/bin/fdfind /usr/local/bin/fd
+# fd: Ubuntu's fd-find package installs a broken symlink (/usr/bin/fdfind -> ../lib/cargo/bin/fd
+# which doesn't exist unless Ubuntu's system Rust is installed). Install the binary directly.
+_fd_ver=$(curl -fsSL "https://api.github.com/repos/sharkdp/fd/releases/latest" \
+  | grep '"tag_name"' | cut -d'"' -f4)
+if [[ -n "$_fd_ver" ]]; then
+  curl -fsSL "https://github.com/sharkdp/fd/releases/download/${_fd_ver}/fd-${_fd_ver}-x86_64-unknown-linux-musl.tar.gz" \
+    -o /tmp/_fd.tar.gz
+  mkdir -p /tmp/_fd_tmp
+  tar -xzf /tmp/_fd.tar.gz -C /tmp/_fd_tmp --strip-components=1
+  mv /tmp/_fd_tmp/fd /usr/local/bin/fd
+  chmod +x /usr/local/bin/fd
+  rm -rf /tmp/_fd.tar.gz /tmp/_fd_tmp
+fi
+
+# bat: check file paths directly (not via PATH-dependent command -v)
 [[ -x /usr/bin/batcat ]] && ln -sf /usr/bin/batcat /usr/local/bin/bat
 [[ -x /usr/bin/bat    ]] && [[ ! -L /usr/local/bin/bat ]] && ln -sf /usr/bin/bat /usr/local/bin/bat
 
@@ -227,7 +240,7 @@ fi
 
 if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
   msg_info "Installing VS Code Tunnel CLI (~65 MB, may take a few minutes)"
-  if curl -fLk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
+  if curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
       -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1 \
     && tar -tzf /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1; then
     tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
@@ -235,7 +248,7 @@ if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
     msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
   else
     rm -f /tmp/vscode-cli.tar.gz
-    msg_warn "VS Code Tunnel download failed — install it manually later with: curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' -o /tmp/vscode-cli.tar.gz && tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/"
+    msg_warn "VS Code Tunnel download failed — install it manually later with: curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' -o /tmp/vscode-cli.tar.gz && tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/"
   fi
 fi
 
@@ -432,7 +445,7 @@ fi
 
 if command -v code &>/dev/null; then
   msg_info "Updating VS Code Tunnel (CLI)"
-  curl -fLk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' \
+  curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
     -o /tmp/vscode-cli.tar.gz
   tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
   rm -f /tmp/vscode-cli.tar.gz
