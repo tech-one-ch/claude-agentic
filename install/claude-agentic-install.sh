@@ -123,10 +123,12 @@ log_run apt-get install -y \
   cron logrotate
 msg_ok "Installed base dependencies"
 
-# fd: Ubuntu's fd-find package installs a broken symlink (/usr/bin/fdfind -> ../lib/cargo/bin/fd
-# which doesn't exist unless Ubuntu's system Rust is installed). Install the binary directly.
-_fd_ver=$(curl -fsSL "https://api.github.com/repos/sharkdp/fd/releases/latest" \
-  | grep '"tag_name"' | cut -d'"' -f4)
+# fd: Ubuntu's fd-find package installs a broken symlink. Install the static binary directly.
+# Version detection via redirect (not the GitHub API — avoids the 60 req/h rate limit).
+msg_info "Installing fd"
+_fd_ver=$(curl -fsL -o /dev/null -w '%{url_effective}' \
+  "https://github.com/sharkdp/fd/releases/latest" 2>/dev/null \
+  | sed 's|.*/tag/||' || true)
 if [[ -n "$_fd_ver" ]]; then
   curl -fsSL "https://github.com/sharkdp/fd/releases/download/${_fd_ver}/fd-${_fd_ver}-x86_64-unknown-linux-musl.tar.gz" \
     -o /tmp/_fd.tar.gz
@@ -135,11 +137,16 @@ if [[ -n "$_fd_ver" ]]; then
   mv /tmp/_fd_tmp/fd /usr/local/bin/fd
   chmod +x /usr/local/bin/fd
   rm -rf /tmp/_fd.tar.gz /tmp/_fd_tmp
+  msg_ok "Installed fd ${_fd_ver}"
+else
+  msg_warn "Could not resolve fd version (network issue?) — fd not installed"
 fi
 
-# bat: Ubuntu apt installs as 'batcat' (name conflict with moreutils). Install directly.
-_bat_ver=$(curl -fsSL "https://api.github.com/repos/sharkdp/bat/releases/latest" \
-  | grep '"tag_name"' | cut -d'"' -f4)
+# bat: Ubuntu apt installs as 'batcat' (name conflict). Install the static binary directly.
+msg_info "Installing bat"
+_bat_ver=$(curl -fsL -o /dev/null -w '%{url_effective}' \
+  "https://github.com/sharkdp/bat/releases/latest" 2>/dev/null \
+  | sed 's|.*/tag/||' || true)
 if [[ -n "$_bat_ver" ]]; then
   curl -fsSL "https://github.com/sharkdp/bat/releases/download/${_bat_ver}/bat-${_bat_ver}-x86_64-unknown-linux-musl.tar.gz" \
     -o /tmp/_bat.tar.gz
@@ -148,6 +155,9 @@ if [[ -n "$_bat_ver" ]]; then
   mv /tmp/_bat_tmp/bat /usr/local/bin/bat
   chmod +x /usr/local/bin/bat
   rm -rf /tmp/_bat.tar.gz /tmp/_bat_tmp
+  msg_ok "Installed bat ${_bat_ver}"
+else
+  msg_warn "Could not resolve bat version (network issue?) — bat not installed"
 fi
 
 # ─── 3. Node.js 22 LTS ───────────────────────────────────────────────────────────
@@ -249,15 +259,20 @@ fi
 
 if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
   msg_info "Installing VS Code Tunnel CLI (~65 MB, may take a few minutes)"
+  _vscode_ok=0
   if curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
       -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1 \
     && tar -tzf /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1; then
-    tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
+    tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/ >>"$LOG_FILE" 2>&1
     rm -f /tmp/vscode-cli.tar.gz
-    msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
+    [[ -x /usr/local/bin/code ]] && _vscode_ok=1
   else
     rm -f /tmp/vscode-cli.tar.gz
-    msg_warn "VS Code Tunnel download failed — install it manually later with: curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' -o /tmp/vscode-cli.tar.gz && tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/"
+  fi
+  if [[ $_vscode_ok -eq 1 ]]; then
+    msg_ok "Installed VS Code Tunnel — run 'code tunnel' once to authenticate (GitHub or Microsoft account)"
+  else
+    msg_warn "VS Code Tunnel install failed — check $LOG_FILE for details"
   fi
 fi
 
