@@ -151,6 +151,10 @@ send_to_supabase() {
     echo ""
   fi
 
+  # Sanitize URL (strip trailing slash and whitespace)
+  supa_url="${supa_url%/}"
+  supa_url="${supa_url%% *}"
+
   # Build JSON
   local details
   if [[ ${#JSON_CHECKS[@]} -gt 0 ]]; then
@@ -173,6 +177,7 @@ send_to_supabase() {
     -H "apikey: ${supa_key}" \
     -H "Authorization: Bearer ${supa_key}" \
     -H "Content-Type: application/json" \
+    -H "Content-Profile: public" \
     -H "Prefer: return=minimal" \
     -d "$payload" 2>/dev/null)
   http_code="$response"
