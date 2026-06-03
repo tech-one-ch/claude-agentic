@@ -137,6 +137,7 @@ if [[ -n "$_fd_ver" ]]; then
   mv /tmp/_fd_tmp/fd /usr/local/bin/fd
   chmod 0755 /usr/local/bin/fd
   chown 0:0 /usr/local/bin/fd
+  ln -sf /usr/local/bin/fd /usr/bin/fd
   rm -rf /tmp/_fd.tar.gz /tmp/_fd_tmp
   msg_ok "Installed fd ${_fd_ver}"
 else
@@ -156,6 +157,7 @@ if [[ -n "$_bat_ver" ]]; then
   mv /tmp/_bat_tmp/bat /usr/local/bin/bat
   chmod 0755 /usr/local/bin/bat
   chown 0:0 /usr/local/bin/bat
+  ln -sf /usr/local/bin/bat /usr/bin/bat
   rm -rf /tmp/_bat.tar.gz /tmp/_bat_tmp
   msg_ok "Installed bat ${_bat_ver}"
 else
@@ -273,6 +275,7 @@ if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
       mv "$_code_bin" /usr/local/bin/code
       chmod 0755 /usr/local/bin/code
       chown 0:0 /usr/local/bin/code
+      ln -sf /usr/local/bin/code /usr/bin/code
       # Verify the binary actually works — log result for diagnostics
       echo "=== VS Code CLI smoke-test ===" >>"$LOG_FILE"
       /usr/local/bin/code --version >>"$LOG_FILE" 2>&1 && _vscode_ok=1 || {
