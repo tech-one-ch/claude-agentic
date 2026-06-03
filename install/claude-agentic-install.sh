@@ -263,9 +263,16 @@ if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
   if curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
       -o /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1 \
     && tar -tzf /tmp/vscode-cli.tar.gz >>"$LOG_FILE" 2>&1; then
-    tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/ >>"$LOG_FILE" 2>&1
-    rm -f /tmp/vscode-cli.tar.gz
-    [[ -x /usr/local/bin/code ]] && _vscode_ok=1
+    # Extract to a temp dir then locate the 'code' binary regardless of archive structure
+    mkdir -p /tmp/_vscode_tmp
+    tar -xzf /tmp/vscode-cli.tar.gz -C /tmp/_vscode_tmp/ >>"$LOG_FILE" 2>&1 || true
+    _code_bin=$(find /tmp/_vscode_tmp -name code -type f 2>/dev/null | head -1)
+    if [[ -n "$_code_bin" ]]; then
+      mv "$_code_bin" /usr/local/bin/code
+      chmod +x /usr/local/bin/code
+      _vscode_ok=1
+    fi
+    rm -rf /tmp/vscode-cli.tar.gz /tmp/_vscode_tmp
   else
     rm -f /tmp/vscode-cli.tar.gz
   fi
@@ -472,10 +479,14 @@ fi
 
 if command -v code &>/dev/null; then
   msg_info "Updating VS Code Tunnel (CLI)"
-  curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
-    -o /tmp/vscode-cli.tar.gz
-  tar -xzf /tmp/vscode-cli.tar.gz -C /usr/local/bin/
-  rm -f /tmp/vscode-cli.tar.gz
+  if curl -fL 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' \
+      -o /tmp/vscode-cli.tar.gz 2>/dev/null; then
+    mkdir -p /tmp/_vscode_tmp
+    tar -xzf /tmp/vscode-cli.tar.gz -C /tmp/_vscode_tmp/ 2>/dev/null || true
+    _code_bin=$(find /tmp/_vscode_tmp -name code -type f 2>/dev/null | head -1)
+    [[ -n "$_code_bin" ]] && mv "$_code_bin" /usr/local/bin/code && chmod +x /usr/local/bin/code
+    rm -rf /tmp/vscode-cli.tar.gz /tmp/_vscode_tmp
+  fi
   msg_ok "VS Code Tunnel updated"
 fi
 
