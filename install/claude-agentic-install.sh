@@ -177,7 +177,7 @@ fi
 
 msg_info "Installing Rust"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/_rustup_init.sh
-log_run sh /tmp/_rustup_init.sh -s -- -y --no-modify-path
+log_run sh /tmp/_rustup_init.sh -y --no-modify-path
 rm -f /tmp/_rustup_init.sh
 source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
 [[ ! -f /usr/local/bin/cargo ]] && ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo 2>/dev/null || true
