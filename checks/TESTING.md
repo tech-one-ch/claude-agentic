@@ -1,5 +1,13 @@
 # Testing & Verification Guide
 
+## Quick check
+
+For the automated check script (all options including Supabase integration), see **[CHECK.md](CHECK.md)**.
+
+---
+
+## Manual checks
+
 Run these commands inside the LXC or VM after installation to verify everything works.
 
 ---
@@ -18,7 +26,7 @@ df -h /
 free -h
 
 # Install log (check for errors)
-grep -i "error\|fail\|404\|fatal" /var/log/claude-agentic-install.log
+grep -E "^\[ERROR\]|^E:|^error:|Failed to|404 Not Found" /var/log/claude-agentic-install.log
 ```
 
 ---

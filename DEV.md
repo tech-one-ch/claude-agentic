@@ -5,6 +5,12 @@
 > Scripts here are not verified and may be broken or incomplete.
 > For production use, refer to the [stable README](https://github.com/tech-one-ch/claude-agentic/blob/main/README.md) on `main`.
 
+> [!TIP]
+> After installing from this branch, verify the installation — see **[CHECK.md](checks/CHECK.md)** for all options (export, Supabase, manual checks).
+> ```bash
+> bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh)
+> ```
+
 ---
 
 Automated installer for a full **Claude Code** development environment.
@@ -175,7 +181,10 @@ claude-agentic/
 │   └── claude-agentic-install.sh  # App installer (dual mode: Proxmox LXC + standalone)
 ├── misc/
 │   └── update.sh                  # Standalone updater (curl-able)
-└── TESTING.md                     # Verification & debug guide
+├── checks/
+│   ├── check.sh
+│   ├── CHECK.md
+│   └── TESTING.md
 ```
 
 ---
