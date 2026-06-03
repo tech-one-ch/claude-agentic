@@ -139,7 +139,7 @@ send_to_supabase() {
   if [[ -n "$supa_url" ]]; then
     echo -e "  URL: ${DIM}${supa_url}${CL}"
   else
-    echo -ne "  URL (e.g. https://abc123.supabase.co): "
+    echo -ne "  Project URL (e.g. https://abc123.supabase.co, without /rest/v1): "
     read -r supa_url
   fi
 
@@ -151,9 +151,10 @@ send_to_supabase() {
     echo ""
   fi
 
-  # Sanitize URL (strip trailing slash and whitespace)
-  supa_url="${supa_url%/}"
+  # Sanitize URL: strip whitespace, trailing slash, and /rest/v1 suffix if pasted from docs
   supa_url="${supa_url%% *}"
+  supa_url="${supa_url%%/rest/v1*}"
+  supa_url="${supa_url%/}"
 
   # Build JSON
   local details
