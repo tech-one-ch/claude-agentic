@@ -117,7 +117,7 @@ log_run apt-get install -y \
   libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev \
   libsqlite3-dev libncursesw5-dev libgdbm-dev liblzma-dev libxml2-dev libxslt-dev \
   tmux screen htop nano vim jq yq unzip zip tar openssl \
-  ripgrep fzf bat \
+  ripgrep fzf \
   net-tools iproute2 dnsutils openssh-server \
   postgresql-client sqlite3 redis-tools \
   cron logrotate
@@ -137,9 +137,18 @@ if [[ -n "$_fd_ver" ]]; then
   rm -rf /tmp/_fd.tar.gz /tmp/_fd_tmp
 fi
 
-# bat: check file paths directly (not via PATH-dependent command -v)
-[[ -x /usr/bin/batcat ]] && ln -sf /usr/bin/batcat /usr/local/bin/bat
-[[ -x /usr/bin/bat    ]] && [[ ! -L /usr/local/bin/bat ]] && ln -sf /usr/bin/bat /usr/local/bin/bat
+# bat: Ubuntu apt installs as 'batcat' (name conflict with moreutils). Install directly.
+_bat_ver=$(curl -fsSL "https://api.github.com/repos/sharkdp/bat/releases/latest" \
+  | grep '"tag_name"' | cut -d'"' -f4)
+if [[ -n "$_bat_ver" ]]; then
+  curl -fsSL "https://github.com/sharkdp/bat/releases/download/${_bat_ver}/bat-${_bat_ver}-x86_64-unknown-linux-musl.tar.gz" \
+    -o /tmp/_bat.tar.gz
+  mkdir -p /tmp/_bat_tmp
+  tar -xzf /tmp/_bat.tar.gz -C /tmp/_bat_tmp --strip-components=1
+  mv /tmp/_bat_tmp/bat /usr/local/bin/bat
+  chmod +x /usr/local/bin/bat
+  rm -rf /tmp/_bat.tar.gz /tmp/_bat_tmp
+fi
 
 # ─── 3. Node.js 22 LTS ───────────────────────────────────────────────────────────
 
@@ -257,6 +266,9 @@ fi
 msg_info "Installing Claude Code"
 curl -fsSL https://claude.ai/install.sh | bash >>"$LOG_FILE" 2>&1 \
   || log_run npm install -g @anthropic-ai/claude-code
+# The official installer puts the binary in ~/.local/bin — export immediately so it's
+# available for the rest of this script and not just in future login shells.
+export PATH="$HOME/.local/bin:$PATH"
 msg_ok "Installed Claude Code $(claude --version 2>/dev/null || echo 'latest')"
 
 msg_info "Configuring Claude Code"
