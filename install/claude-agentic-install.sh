@@ -135,7 +135,8 @@ if [[ -n "$_fd_ver" ]]; then
   mkdir -p /tmp/_fd_tmp
   tar -xzf /tmp/_fd.tar.gz -C /tmp/_fd_tmp --strip-components=1
   mv /tmp/_fd_tmp/fd /usr/local/bin/fd
-  chmod +x /usr/local/bin/fd
+  chmod 0755 /usr/local/bin/fd
+  chown 0:0 /usr/local/bin/fd
   rm -rf /tmp/_fd.tar.gz /tmp/_fd_tmp
   msg_ok "Installed fd ${_fd_ver}"
 else
@@ -153,7 +154,8 @@ if [[ -n "$_bat_ver" ]]; then
   mkdir -p /tmp/_bat_tmp
   tar -xzf /tmp/_bat.tar.gz -C /tmp/_bat_tmp --strip-components=1
   mv /tmp/_bat_tmp/bat /usr/local/bin/bat
-  chmod +x /usr/local/bin/bat
+  chmod 0755 /usr/local/bin/bat
+  chown 0:0 /usr/local/bin/bat
   rm -rf /tmp/_bat.tar.gz /tmp/_bat_tmp
   msg_ok "Installed bat ${_bat_ver}"
 else
@@ -269,8 +271,22 @@ if [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]]; then
     _code_bin=$(find /tmp/_vscode_tmp -name code -type f 2>/dev/null | head -1)
     if [[ -n "$_code_bin" ]]; then
       mv "$_code_bin" /usr/local/bin/code
-      chmod +x /usr/local/bin/code
-      _vscode_ok=1
+      chmod 0755 /usr/local/bin/code
+      chown 0:0 /usr/local/bin/code
+      # Verify the binary actually works — log result for diagnostics
+      echo "=== VS Code CLI smoke-test ===" >>"$LOG_FILE"
+      /usr/local/bin/code --version >>"$LOG_FILE" 2>&1 && _vscode_ok=1 || {
+        echo "code --version exit $? — binary may need unprivileged_userns_clone" >>"$LOG_FILE"
+        # Some kernels disable unprivileged user namespaces; enable it so VS Code tunnel can sandbox
+        if [[ -f /proc/sys/kernel/unprivileged_userns_clone ]]; then
+          echo 1 > /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || true
+          sysctl -w kernel.unprivileged_userns_clone=1 >>"$LOG_FILE" 2>&1 || true
+          # Persist across reboots
+          echo "kernel.unprivileged_userns_clone=1" > /etc/sysctl.d/99-vscode-tunnel.conf
+        fi
+        /usr/local/bin/code --version >>"$LOG_FILE" 2>&1 && _vscode_ok=1 || \
+          echo "code --version still failed after sysctl fix — exit $?" >>"$LOG_FILE"
+      }
     fi
     rm -rf /tmp/vscode-cli.tar.gz /tmp/_vscode_tmp
   else
