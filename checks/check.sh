@@ -60,7 +60,10 @@ FAIL_COUNT=0
 WARN_COUNT=0
 SKIP_COUNT=0
 declare -a LINES=()
-declare -a JSON_CHECKS=()
+# Parallel arrays for JSON — avoids escaping issues, jq handles encoding
+declare -a JSON_LABELS=()
+declare -a JSON_STATUSES=()
+declare -a JSON_DETAILS=()
 
 record() {
   local label="$1" status="$2" detail="$3"
@@ -72,8 +75,9 @@ record() {
     skip) lbl="$LBL_SKIP"; SKIP_COUNT=$((SKIP_COUNT+1)) ;;
   esac
   LINES+=("  ${lbl}  ${BOLD}${label}${CL}  ${DIM}${detail}${CL}")
-  local el="${label//\"/\\\"}"; local ed="${detail//\"/\\\"}"
-  JSON_CHECKS+=("{\"label\":\"${el}\",\"status\":\"${status}\",\"detail\":\"${ed}\"}")
+  JSON_LABELS+=("$label")
+  JSON_STATUSES+=("$status")
+  JSON_DETAILS+=("$detail")
 }
 
 flush() {
@@ -156,21 +160,34 @@ send_to_supabase() {
   supa_url="${supa_url%%/rest/v1*}"
   supa_url="${supa_url%/}"
 
-  # Build JSON
-  local details
-  if [[ ${#JSON_CHECKS[@]} -gt 0 ]]; then
-    details=$(printf '%s,' "${JSON_CHECKS[@]}")
-    details="[${details%,}]"
-  else
-    details="[]"
-  fi
+  # Build JSON using jq (handles all escaping correctly)
+  local details_json payload
 
-  local payload
-  payload=$(printf \
-    '{"hostname":"%s","env_type":"%s","os_name":"%s","ip":"%s","pass_count":%d,"fail_count":%d,"warn_count":%d,"skip_count":%d,"details":%s}' \
-    "$HOSTNAME_VAL" "$ENV_TYPE" "$OS_NAME" "${IP:-}" \
-    "$PASS_COUNT" "$FAIL_COUNT" "$WARN_COUNT" "$SKIP_COUNT" \
-    "$details")
+  if command -v jq &>/dev/null; then
+    details_json=$(
+      for i in "${!JSON_LABELS[@]}"; do
+        jq -n \
+          --arg label   "${JSON_LABELS[$i]}" \
+          --arg status  "${JSON_STATUSES[$i]}" \
+          --arg detail  "${JSON_DETAILS[$i]}" \
+          '{label: $label, status: $status, detail: $detail}'
+      done | jq -s '.'
+    )
+    payload=$(jq -n \
+      --arg   hostname   "$HOSTNAME_VAL" \
+      --arg   env_type   "$ENV_TYPE" \
+      --arg   os_name    "$OS_NAME" \
+      --arg   ip         "${IP:-}" \
+      --argjson pass_count  "$PASS_COUNT" \
+      --argjson fail_count  "$FAIL_COUNT" \
+      --argjson warn_count  "$WARN_COUNT" \
+      --argjson skip_count  "$SKIP_COUNT" \
+      --argjson details     "$details_json" \
+      '{hostname:$hostname,env_type:$env_type,os_name:$os_name,ip:$ip,pass_count:$pass_count,fail_count:$fail_count,warn_count:$warn_count,skip_count:$skip_count,details:$details}')
+  else
+    echo -e "  ${YW}⚠${CL} jq not found — install it and retry for reliable JSON encoding"
+    return
+  fi
 
   local response http_code
   response=$(curl -s -o /tmp/_supa_resp.txt -w "%{http_code}" \
@@ -227,7 +244,8 @@ SQL
 ENV_TYPE=$(detect_env)
 OS_NAME=$(grep -oP '(?<=^PRETTY_NAME=").*(?=")' /etc/os-release 2>/dev/null || echo "Unknown OS")
 HOSTNAME_VAL=$(hostname)
-IP=$(hostname -I | tr -s ' \n' '\n' | grep -Eo '([0-9]+\.){3}[0-9]+' | tail -1)
+IP=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)
+IP="${IP:-$(hostname -I | tr -s ' ' '\n' | grep -Eo '([0-9]+\.){3}[0-9]+' | grep -v '^127\.' | grep -v '^172\.' | head -1)}"
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
 run_checks() {
