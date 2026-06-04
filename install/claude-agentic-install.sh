@@ -87,12 +87,13 @@ else
   REAL_HOME="/root"
 fi
 
-# Run a command as REAL_USER with their HOME set (no-op wrapper when already root)
+# Run a command as REAL_USER (no-op wrapper when already root)
+# Uses runuser instead of su — runuser works without a tty, designed for scripts
 run_as_user() {
   if [[ "$REAL_USER" == "root" ]]; then
     "$@"
   else
-    env HOME="$REAL_HOME" su "$REAL_USER" -c "$(printf '%q ' "$@")"
+    runuser -l "$REAL_USER" -c "$(printf '%q ' "$@")"
   fi
 }
 
@@ -341,9 +342,9 @@ if [[ "$REAL_USER" == "root" ]]; then
   curl -fsSL https://claude.ai/install.sh | bash >>"$LOG_FILE" 2>&1 \
     || log_run npm install -g @anthropic-ai/claude-code
 else
-  env HOME="$REAL_HOME" su "$REAL_USER" -c \
+  runuser -l "$REAL_USER" -c \
     'curl -fsSL https://claude.ai/install.sh | bash' >>"$LOG_FILE" 2>&1 \
-    || log_run run_as_user npm install -g @anthropic-ai/claude-code
+    || log_run npm install -g @anthropic-ai/claude-code
 fi
 # The official installer puts the binary in ~/.local/bin — export immediately so it's
 # available for the rest of this script and not just in future login shells.
