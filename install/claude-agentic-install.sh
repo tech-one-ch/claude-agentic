@@ -678,8 +678,8 @@ else
   [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]] && \
     echo -e "  ${INFO} VS Code Tunnel: run ${BOLD}code tunnel${CL} once to authenticate"
   echo -e "  ${INFO} Workspace   : ${BOLD}/projects${CL}"
-  echo -e "  ${INFO} Claude Code : run ${BOLD}claude${CL} and follow the login link\n"
-  echo -e "  ${YW}Recommended first step in Claude Code:${CL}"
-  echo -e "  ${BOLD}/plugin marketplace add obra/superpowers-marketplace${CL}"
-  echo -e "  ${BOLD}/plugin install superpowers@superpowers-marketplace${CL}\n"
+  echo -e "  ${INFO} Claude Code : run ${BOLD}claude${CL} and follow the login link"
+  echo -e "  ${INFO} Plugins     : auto-install on first launch (code-review, commit-commands,"
+  echo -e "                    security-guidance, context7, frontend-design, superpowers)"
+  echo -e "  ${INFO} Verify      : inside Claude Code, type ${BOLD}/plugin list${CL}\n"
 fi
