@@ -12,13 +12,13 @@
 # ─── Mode detection & logging ──────────────────────────────────────────────────
 
 LOG_FILE="/var/log/claude-agentic-install.log"
-mkdir -p "$(dirname "$LOG_FILE")"
 
 if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   # community-scripts mode:
   # - commands run normally, output goes to stdout (captured by build.func)
   # - log_run is a transparent pass-through — no redirection, no interference
   log_run() { "$@"; }
+  mkdir -p "$(dirname "$LOG_FILE")"
   echo "=== Install started: $(date) ===" >> "$LOG_FILE"
   source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
   color
@@ -28,7 +28,18 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   network_check
   update_os
 else
-  # standalone mode: tee to both stdout and log file
+  # standalone mode — escalate first, before any operation that needs root
+  if [[ $EUID -ne 0 ]]; then
+    if [[ -f "$0" ]]; then
+      exec sudo bash "$0" "$@"
+    fi
+    # Pipe invocation (bash <(curl ...) or curl | bash): $0 is not a real file,
+    # so we cannot re-exec. Tell the user to add sudo explicitly.
+    echo -e "\nRun with sudo:\n  sudo bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/install/claude-agentic-install.sh)\n" >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$LOG_FILE")"
   echo "=== Install started: $(date) ===" >> "$LOG_FILE"
   exec > >(tee -a "$LOG_FILE") 2>&1
   # log_run redirects output to log file only (screen stays clean)
@@ -49,8 +60,6 @@ else
   msg_ok()    { local m="$1"; echo -e "${BFR} ${CM} ${GN}${m}${CL}"; }
   msg_error() { local m="$1"; echo -e "${BFR} ${CROSS} ${RD}${m}${CL}"; exit 1; }
   msg_warn()  { local m="$1"; echo -e " ${INFO} ${YW}${m}${CL}"; }
-
-  [[ $EUID -ne 0 ]] && msg_error "Run as root: sudo bash install/claude-agentic-install.sh"
   [[ ! -f /etc/os-release ]] && msg_error "Cannot detect OS"
   source /etc/os-release
   [[ "$ID" != "debian" && "$ID" != "ubuntu" ]] && msg_error "Requires Debian or Ubuntu (got: ${ID})"
@@ -66,6 +75,26 @@ else
 fi
 
 APP="${APP:-Claude Agentic}"
+
+# ─── User context ──────────────────────────────────────────────────────────────
+# LXC / direct root  : SUDO_USER unset  → REAL_USER=root, REAL_HOME=/root
+# VM via sudo        : SUDO_USER=alice  → REAL_USER=alice, REAL_HOME=/home/alice
+if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+  REAL_USER="$SUDO_USER"
+  REAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+else
+  REAL_USER="root"
+  REAL_HOME="/root"
+fi
+
+# Run a command as REAL_USER with their HOME set (no-op wrapper when already root)
+run_as_user() {
+  if [[ "$REAL_USER" == "root" ]]; then
+    "$@"
+  else
+    env HOME="$REAL_HOME" su "$REAL_USER" -c "$(printf '%q ' "$@")"
+  fi
+}
 
 # ─── Configuration ─────────────────────────────────────────────────────────────
 # Default IDE when no input is given (timeout or non-interactive mode)
@@ -211,11 +240,13 @@ fi
 
 msg_info "Installing Rust"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/_rustup_init.sh
-log_run sh /tmp/_rustup_init.sh -y --no-modify-path
+log_run run_as_user sh /tmp/_rustup_init.sh -y --no-modify-path
 rm -f /tmp/_rustup_init.sh
-source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
-[[ ! -f /usr/local/bin/cargo ]] && ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo 2>/dev/null || true
-[[ ! -f /usr/local/bin/rustc ]] && ln -sf "$HOME/.cargo/bin/rustc" /usr/local/bin/rustc 2>/dev/null || true
+source "$REAL_HOME/.cargo/env" 2>/dev/null || export PATH="$REAL_HOME/.cargo/bin:$PATH"
+[[ ! -f /usr/local/bin/cargo ]] && ln -sf "$REAL_HOME/.cargo/bin/cargo" /usr/local/bin/cargo 2>/dev/null || true
+[[ ! -f /usr/local/bin/rustc ]] && ln -sf "$REAL_HOME/.cargo/bin/rustc" /usr/local/bin/rustc 2>/dev/null || true
+ln -sf /usr/local/bin/cargo /usr/bin/cargo 2>/dev/null || true
+ln -sf /usr/local/bin/rustc /usr/bin/rustc 2>/dev/null || true
 msg_ok "Installed Rust $(rustc --version 2>/dev/null | cut -d' ' -f2 || echo 'latest')"
 
 # ─── 7. Docker + Compose plugin ───────────────────────────────────────────────────
@@ -250,14 +281,15 @@ if [[ "$IDE_CHOICE" == "codeserver" || "$IDE_CHOICE" == "both" ]]; then
   log_run sh /tmp/_codeserver_install.sh
   rm -f /tmp/_codeserver_install.sh
   CS_PASSWORD=$(openssl rand -hex 16)
-  mkdir -p /root/.config/code-server
-  cat > /root/.config/code-server/config.yaml <<EOF
+  mkdir -p "$REAL_HOME/.config/code-server"
+  cat > "$REAL_HOME/.config/code-server/config.yaml" <<EOF
 bind-addr: 0.0.0.0:8443
 auth: password
 password: ${CS_PASSWORD}
 cert: true
 EOF
-  systemctl enable --now code-server@root &>/dev/null || true
+  [[ "$REAL_USER" != "root" ]] && chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/code-server"
+  systemctl enable --now "code-server@$REAL_USER" &>/dev/null || true
   msg_ok "Installed code-server (port 8443)"
 fi
 
@@ -305,16 +337,22 @@ fi
 # ─── 10. Claude Code ──────────────────────────────────────────────────────────────
 
 msg_info "Installing Claude Code"
-curl -fsSL https://claude.ai/install.sh | bash >>"$LOG_FILE" 2>&1 \
-  || log_run npm install -g @anthropic-ai/claude-code
+if [[ "$REAL_USER" == "root" ]]; then
+  curl -fsSL https://claude.ai/install.sh | bash >>"$LOG_FILE" 2>&1 \
+    || log_run npm install -g @anthropic-ai/claude-code
+else
+  env HOME="$REAL_HOME" su "$REAL_USER" -c \
+    'curl -fsSL https://claude.ai/install.sh | bash' >>"$LOG_FILE" 2>&1 \
+    || log_run run_as_user npm install -g @anthropic-ai/claude-code
+fi
 # The official installer puts the binary in ~/.local/bin — export immediately so it's
 # available for the rest of this script and not just in future login shells.
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$REAL_HOME/.local/bin:$PATH"
 msg_ok "Installed Claude Code $(claude --version 2>/dev/null || echo 'latest')"
 
 msg_info "Configuring Claude Code"
-mkdir -p /root/.claude
-cat > /root/.claude/settings.json <<'EOF'
+mkdir -p "$REAL_HOME/.claude"
+cat > "$REAL_HOME/.claude/settings.json" <<'EOF'
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
@@ -346,17 +384,19 @@ cat > /root/.claude/settings.json <<'EOF'
 }
 EOF
 msg_ok "Configured Claude Code (all permissions pre-approved)"
+[[ "$REAL_USER" != "root" ]] && chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.claude"
 
 # ─── 11. Workspace & CLAUDE.md ────────────────────────────────────────────────────
 
 msg_info "Setting up workspace"
-mkdir -p /project
-cat > /project/CLAUDE.md <<'EOF'
+mkdir -p /projects
+[[ "$REAL_USER" != "root" ]] && chown "$REAL_USER:$REAL_USER" /projects
+cat > /projects/CLAUDE.md <<'EOF'
 # Claude Agentic Workspace
 
 ## Environment
 - **OS**: Ubuntu 24.04 (LXC on Proxmox or standalone VM/VPS)
-- **Working directory**: /project
+- **Working directory**: /projects
 - **User**: root
 
 ## Available tools
@@ -401,21 +441,22 @@ Enforces: brainstorm → design → plan → implement (subagents) → TDD → r
 /plugin install security-guidance@claude-plugins-official
 ```
 EOF
-msg_ok "Workspace ready at /project"
+msg_ok "Workspace ready at /projects"
 
 # ─── 12. Git global defaults ──────────────────────────────────────────────────────
 
 msg_info "Configuring Git defaults"
-git config --global init.defaultBranch main
-git config --global core.editor nano
-git config --global pull.rebase false
-git config --global core.autocrlf false
+git config --file "$REAL_HOME/.gitconfig" init.defaultBranch main
+git config --file "$REAL_HOME/.gitconfig" core.editor nano
+git config --file "$REAL_HOME/.gitconfig" pull.rebase false
+git config --file "$REAL_HOME/.gitconfig" core.autocrlf false
+[[ "$REAL_USER" != "root" ]] && chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.gitconfig" || true
 msg_ok "Git defaults configured"
 
 # ─── 13. Shell environment ────────────────────────────────────────────────────────
 
 msg_info "Configuring shell environment"
-cat >> /root/.bashrc <<'EOF'
+cat >> "$REAL_HOME/.bashrc" <<'EOF'
 
 # ── Claude Agentic ──────────────────────────────────────────────
 export LANG=en_US.UTF-8
@@ -434,8 +475,8 @@ alias gl='git log --oneline -20'
 alias dc='docker compose'
 alias dps='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
 
-# Start in /project by default
-[[ -d /project ]] && cd /project
+# Start in /projects by default
+[[ -d /projects ]] && cd /projects
 EOF
 msg_ok "Shell environment configured"
 
@@ -562,8 +603,8 @@ printf "
   ╠═══════════════════════════════════════════════════════╣
 %b  ║                                                       ║
   ║  Start Claude: claude                                 ║
-  ║  Workspace:    /project                               ║
-  ║  Plugins doc:  cat /project/CLAUDE.md                 ║
+  ║  Workspace:    /projects                               ║
+  ║  Plugins doc:  cat /projects/CLAUDE.md                 ║
   ╚═══════════════════════════════════════════════════════╝
 " "$IDE_LINES" > /etc/motd
 msg_ok "Login banner configured"
@@ -580,7 +621,7 @@ else
     echo -e "  ${INFO} Code Server : ${BOLD}https://${SERVER_IP}:8443${CL}  (password: ${CS_PASSWORD})"
   [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]] && \
     echo -e "  ${INFO} VS Code Tunnel: run ${BOLD}code tunnel${CL} once to authenticate"
-  echo -e "  ${INFO} Workspace   : ${BOLD}/project${CL}"
+  echo -e "  ${INFO} Workspace   : ${BOLD}/projects${CL}"
   echo -e "  ${INFO} Claude Code : run ${BOLD}claude${CL} and follow the login link\n"
   echo -e "  ${YW}Recommended first step in Claude Code:${CL}"
   echo -e "  ${BOLD}/plugin marketplace add obra/superpowers-marketplace${CL}"
