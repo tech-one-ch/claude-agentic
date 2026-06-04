@@ -8,7 +8,7 @@
 > [!TIP]
 > After installing from this branch, verify the installation — see **[CHECK.md](checks/CHECK.md)** for all options (export, Supabase, manual checks).
 > ```bash
-> bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh)
+> curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh | bash
 > ```
 
 ---
@@ -70,10 +70,10 @@ pct exec <CTID> -- update
 
 ## Option B — Standalone (any Debian/Ubuntu)
 
-Run on your **existing VM, VPS, or LXC** as root:
+Run on your **existing VM, VPS, or LXC** (as root or any user with sudo):
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/install/claude-agentic-install.sh)"
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/install/claude-agentic-install.sh | sudo bash
 ```
 
 Tested on: **Ubuntu 22.04, Ubuntu 24.04, Debian 12**

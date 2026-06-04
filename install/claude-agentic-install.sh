@@ -35,7 +35,7 @@ else
     fi
     # Pipe invocation (bash <(curl ...) or curl | bash): $0 is not a real file,
     # so we cannot re-exec. Tell the user to add sudo explicitly.
-    echo -e "\nRun with sudo:\n  sudo bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/install/claude-agentic-install.sh)\n" >&2
+    echo -e "\nRun with sudo:\n  curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/install/claude-agentic-install.sh | sudo bash\n" >&2
     exit 1
   fi
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Agentic — Installation check script
-# Usage: bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) [options]
+# Usage: curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash [options]
 # Docs:  https://github.com/tech-one-ch/claude-agentic/blob/main/checks/CHECK.md
 
 set -uo pipefail
