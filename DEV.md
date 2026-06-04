@@ -106,7 +106,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
 
 3. **Start Claude Code** from the terminal:
    ```bash
-   cd /project
+   cd /projects
    claude
    ```
    At first launch, Claude shows a login link — open it in your browser to authenticate with your Anthropic account (no API key needed).
@@ -123,7 +123,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agent
 Once everything is set up, Claude Code can create PRs automatically:
 
 ```bash
-cd /project/my-repo
+cd /projects/my-repo
 claude "Add a dark mode toggle to the settings page, then open a PR on GitHub"
 ```
 

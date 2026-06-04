@@ -381,14 +381,14 @@ msg_ok "Configured Claude Code (all permissions pre-approved)"
 # ─── 11. Workspace & CLAUDE.md ────────────────────────────────────────────────────
 
 msg_info "Setting up workspace"
-mkdir -p /project
-[[ "$REAL_USER" != "root" ]] && chown "$REAL_USER:$REAL_USER" /project
-cat > /project/CLAUDE.md <<'EOF'
+mkdir -p /projects
+[[ "$REAL_USER" != "root" ]] && chown "$REAL_USER:$REAL_USER" /projects
+cat > /projects/CLAUDE.md <<'EOF'
 # Claude Agentic Workspace
 
 ## Environment
 - **OS**: Ubuntu 24.04 (LXC on Proxmox or standalone VM/VPS)
-- **Working directory**: /project
+- **Working directory**: /projects
 - **User**: root
 
 ## Available tools
@@ -433,7 +433,7 @@ Enforces: brainstorm → design → plan → implement (subagents) → TDD → r
 /plugin install security-guidance@claude-plugins-official
 ```
 EOF
-msg_ok "Workspace ready at /project"
+msg_ok "Workspace ready at /projects"
 
 # ─── 12. Git global defaults ──────────────────────────────────────────────────────
 
@@ -467,8 +467,8 @@ alias gl='git log --oneline -20'
 alias dc='docker compose'
 alias dps='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
 
-# Start in /project by default
-[[ -d /project ]] && cd /project
+# Start in /projects by default
+[[ -d /projects ]] && cd /projects
 EOF
 msg_ok "Shell environment configured"
 
@@ -595,8 +595,8 @@ printf "
   ╠═══════════════════════════════════════════════════════╣
 %b  ║                                                       ║
   ║  Start Claude: claude                                 ║
-  ║  Workspace:    /project                               ║
-  ║  Plugins doc:  cat /project/CLAUDE.md                 ║
+  ║  Workspace:    /projects                               ║
+  ║  Plugins doc:  cat /projects/CLAUDE.md                 ║
   ╚═══════════════════════════════════════════════════════╝
 " "$IDE_LINES" > /etc/motd
 msg_ok "Login banner configured"
@@ -613,7 +613,7 @@ else
     echo -e "  ${INFO} Code Server : ${BOLD}https://${SERVER_IP}:8443${CL}  (password: ${CS_PASSWORD})"
   [[ "$IDE_CHOICE" == "tunnel" || "$IDE_CHOICE" == "both" ]] && \
     echo -e "  ${INFO} VS Code Tunnel: run ${BOLD}code tunnel${CL} once to authenticate"
-  echo -e "  ${INFO} Workspace   : ${BOLD}/project${CL}"
+  echo -e "  ${INFO} Workspace   : ${BOLD}/projects${CL}"
   echo -e "  ${INFO} Claude Code : run ${BOLD}claude${CL} and follow the login link\n"
   echo -e "  ${YW}Recommended first step in Claude Code:${CL}"
   echo -e "  ${BOLD}/plugin marketplace add obra/superpowers-marketplace${CL}"

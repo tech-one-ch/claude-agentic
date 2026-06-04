@@ -299,8 +299,8 @@ run_checks() {
   echo -e "  ${BOLD}Claude Code${CL}"
   check_cmd  "claude"         "claude" "claude --version"
   check_path "settings.json" "$HOME/.claude/settings.json"
-  check_path "workspace"     "/project"
-  check_path "CLAUDE.md"     "/project/CLAUDE.md"
+  check_path "workspace"     "/projects"
+  check_path "CLAUDE.md"     "/projects/CLAUDE.md"
   flush; echo ""
 
   # 5. Web IDE

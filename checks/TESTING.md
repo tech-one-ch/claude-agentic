@@ -138,10 +138,10 @@ update --help 2>/dev/null || update
 
 ```bash
 # Default workspace exists
-ls /project
+ls /projects
 
 # CLAUDE.md present
-cat /project/CLAUDE.md
+cat /projects/CLAUDE.md
 
 # Git defaults
 git config --global --list
