@@ -98,6 +98,9 @@ cat /root/.claude/settings.json
 # Permissions configured (should list all allowed tools)
 jq '.permissions.allow' /root/.claude/settings.json
 
+# Remote control config (should contain autoStartRemoteControl: true)
+cat /root/.claude.json
+
 # Start Claude (will prompt for login on first run)
 claude --version
 ```

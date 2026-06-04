@@ -74,6 +74,18 @@ else
   msg_ok "System updated"
 fi
 
+# ─── apt_install — resilient package installation ─────────────────────────────
+# Tries batch install first; if it fails, retries one-by-one so a single
+# renamed/dropped package does not abort the entire installation.
+apt_install() {
+  if ! log_run apt-get install -y "$@"; then
+    for _pkg in "$@"; do
+      log_run apt-get install -y "$_pkg" || \
+        msg_warn "Package not available: $_pkg (skipping)"
+    done
+  fi
+}
+
 APP="${APP:-Claude Agentic}"
 
 # ─── User context ──────────────────────────────────────────────────────────────
@@ -130,7 +142,7 @@ fi
 # ─── 1. Locale ──────────────────────────────────────────────────────────────────
 
 msg_info "Configuring locale"
-log_run apt-get install -y locales
+apt_install locales
 sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen
 log_run locale-gen en_US.UTF-8
 log_run update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
@@ -141,14 +153,14 @@ msg_ok "Locale configured (en_US.UTF-8)"
 # ─── 2. Base dependencies ────────────────────────────────────────────────────────
 
 msg_info "Installing base dependencies"
-log_run apt-get install -y \
+apt_install \
   curl wget git build-essential make cmake pkg-config autoconf automake libtool \
   ca-certificates gnupg lsb-release apt-transport-https software-properties-common \
   libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev \
-  libsqlite3-dev libncursesw5-dev libgdbm-dev liblzma-dev libxml2-dev libxslt-dev \
+  libsqlite3-dev libncursesw5-dev libgdbm-dev liblzma-dev libxml2-dev libxslt1-dev \
   tmux screen htop nano vim jq yq unzip zip tar openssl \
   ripgrep fzf \
-  net-tools iproute2 dnsutils openssh-server \
+  net-tools iproute2 bind9-dnsutils openssh-server \
   postgresql-client sqlite3 redis-tools \
   cron logrotate
 msg_ok "Installed base dependencies"
@@ -200,7 +212,7 @@ msg_info "Installing Node.js 22 LTS"
 curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/_nodesource_setup.sh
 log_run bash /tmp/_nodesource_setup.sh
 rm -f /tmp/_nodesource_setup.sh
-log_run apt-get install -y nodejs
+apt_install nodejs
 msg_ok "Installed Node.js $(node --version)"
 
 msg_info "Installing global Node.js tools"
@@ -210,7 +222,7 @@ msg_ok "Installed TypeScript, ts-node, ESLint, Prettier"
 # ─── 4. Python 3 ─────────────────────────────────────────────────────────────────
 
 msg_info "Installing Python tools"
-log_run apt-get install -y python3 python3-pip python3-venv python3-dev
+apt_install python3 python3-pip python3-venv python3-dev
 log_run pip3 install --quiet --break-system-packages pipx uv 2>/dev/null || \
   log_run pip3 install --quiet pipx uv 2>/dev/null || true
 msg_ok "Installed Python $(python3 --version | cut -d' ' -f2)"
@@ -257,7 +269,7 @@ curl -fsSL https://get.docker.com -o /tmp/_docker_install.sh
 log_run sh /tmp/_docker_install.sh
 rm -f /tmp/_docker_install.sh
 log_run systemctl enable --now docker
-log_run apt-get install -y docker-compose-plugin
+apt_install docker-compose-plugin
 msg_ok "Installed Docker $(docker --version | cut -d' ' -f3 | tr -d ',') + Compose plugin"
 
 # ─── 8. GitHub CLI ────────────────────────────────────────────────────────────────
@@ -269,7 +281,7 @@ chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
   https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
 log_run apt-get update
-log_run apt-get install -y gh
+apt_install gh
 msg_ok "Installed GitHub CLI $(gh --version | head -1 | cut -d' ' -f3)"
 
 # ─── 9. Web IDE ───────────────────────────────────────────────────────────────────
@@ -380,12 +392,24 @@ cat > "$REAL_HOME/.claude/settings.json" <<'EOF'
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
   },
-  "alwaysThinkingEnabled": true,
-  "disableRemoteControl": false
+  "alwaysThinkingEnabled": true
 }
 EOF
 msg_ok "Configured Claude Code (all permissions pre-approved)"
 [[ "$REAL_USER" != "root" ]] && chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.claude"
+
+# ~/.claude.json — user-level config (distinct from project settings.json)
+# Enables remote control auto-start (requires Pro/Max account, not API key)
+if [[ -f "$REAL_HOME/.claude.json" ]] && command -v jq &>/dev/null; then
+  _tmp_cj=$(mktemp)
+  jq '. + {"autoStartRemoteControl": true}' "$REAL_HOME/.claude.json" \
+    > "$_tmp_cj" && mv "$_tmp_cj" "$REAL_HOME/.claude.json" \
+    || rm -f "$_tmp_cj"
+else
+  echo '{"autoStartRemoteControl": true}' > "$REAL_HOME/.claude.json"
+fi
+[[ "$REAL_USER" != "root" ]] && chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.claude.json"
+msg_ok "Remote control auto-start configured (~/.claude.json)"
 
 # ─── 11. Workspace & CLAUDE.md ────────────────────────────────────────────────────
 
@@ -401,7 +425,7 @@ cat > /projects/CLAUDE.md <<'EOF'
 - **User**: root
 
 ## Available tools
-- **Languages**: Node.js 22 LTS, TypeScript, Python 3, Go (latest), Rust (latest)
+- **Languages**: Node.js 22 LTS, TypeScript, Python 3 (system default), Go (latest), Rust (latest)
 - **Package managers**: npm, pip (--break-system-packages), cargo, go install
 - **Docker**: Docker Engine + Compose plugin (`docker compose`)
 - **GitHub**: `gh` CLI pre-installed — use it for PRs, issues, releases
@@ -415,7 +439,15 @@ WebFetch, WebSearch, Task, Agent, Grep, Glob, LS, MCP tools.
 
 ## Agent teams
 Agent teams are enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
-Use parallel subagents for complex tasks via the Task tool.
+Subagents (Task tool) run parallel work within a single Claude session.
+Agent teams coordinate multiple autonomous Claude instances for broad,
+multi-step workflows. Use subagents for most parallel tasks; agent teams
+for large autonomous orchestration.
+
+## Remote control
+Remote control auto-start is enabled — external tools can drive Claude
+without an interactive terminal session.
+Requires Pro/Max account login (not API key).
 
 ## Git conventions
 - Default branch: main
@@ -426,20 +458,20 @@ Use parallel subagents for complex tasks via the Task tool.
 - Compose files: `/docker/<service>/docker-compose.yml`
 - All containers need `security_opt: [apparmor=unconfined]` in this LXC
 
-## Recommended plugins (install inside Claude Code)
+## Plugins (install inside Claude Code)
 
-### Superpowers — structured development methodology
-Enforces: brainstorm → design → plan → implement (subagents) → TDD → review
-```
-/plugin marketplace add obra/superpowers-marketplace
-/plugin install superpowers@superpowers-marketplace
-```
-
-### Other useful plugins (from official marketplace)
+### Official marketplace
 ```
 /plugin install code-review@claude-plugins-official
 /plugin install commit-commands@claude-plugins-official
 /plugin install security-guidance@claude-plugins-official
+```
+
+### Superpowers — structured development methodology (third-party)
+Enforces: brainstorm → design → plan → implement (subagents) → TDD → review
+```
+/plugin marketplace add obra/superpowers-marketplace
+/plugin install superpowers@superpowers-marketplace
 ```
 EOF
 msg_ok "Workspace ready at /projects"
@@ -457,6 +489,7 @@ msg_ok "Git defaults configured"
 # ─── 13. Shell environment ────────────────────────────────────────────────────────
 
 msg_info "Configuring shell environment"
+if ! grep -q "Claude Agentic" "$REAL_HOME/.bashrc" 2>/dev/null; then
 cat >> "$REAL_HOME/.bashrc" <<'EOF'
 
 # ── Claude Agentic ──────────────────────────────────────────────
@@ -479,6 +512,7 @@ alias dps='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
 # Start in /projects by default
 [[ -d /projects ]] && cd /projects
 EOF
+fi
 msg_ok "Shell environment configured"
 
 # ─── 14. SSH ──────────────────────────────────────────────────────────────────────
@@ -534,7 +568,9 @@ msg_ok "Claude Code updated ($(claude --version 2>/dev/null || echo 'latest'))"
 if command -v code-server &>/dev/null; then
   msg_info "Updating code-server"
   curl -fsSL https://code-server.dev/install.sh | sh
-  systemctl restart code-server@root 2>/dev/null || true
+  _cs_svc=$(systemctl list-unit-files 'code-server@*.service' --no-legend 2>/dev/null \
+    | awk '$2 ~ /enabled/ {gsub(/\.service$/, "", $1); print $1; exit}')
+  [[ -n "$_cs_svc" ]] && systemctl restart "$_cs_svc" 2>/dev/null || true
   msg_ok "code-server updated"
 fi
 
@@ -564,7 +600,9 @@ cat > /etc/cron.weekly/claude-agentic-update <<'CRON'
 apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq && apt-get autoremove -y -qq
 curl -fsSL https://claude.ai/install.sh | bash 2>/dev/null || npm update -g @anthropic-ai/claude-code 2>/dev/null || true
 curl -fsSL https://code-server.dev/install.sh | sh 2>/dev/null || true
-systemctl restart code-server@root 2>/dev/null || true
+_cs_svc=$(systemctl list-unit-files 'code-server@*.service' --no-legend 2>/dev/null \
+  | awk '$2 ~ /enabled/ {gsub(/\.service$/, "", $1); print $1; exit}')
+[[ -n "$_cs_svc" ]] && systemctl restart "$_cs_svc" 2>/dev/null || true
 CRON
 chmod +x /etc/cron.weekly/claude-agentic-update
 
@@ -579,7 +617,7 @@ cat > /etc/logrotate.d/claude-agentic <<'EOF'
 EOF
 msg_ok "Weekly auto-update scheduled"
 
-# ─── 16. Cleanup ──────────────────────────────────────────────────────────────────
+# ─── 17. Cleanup ──────────────────────────────────────────────────────────────────
 
 msg_info "Cleaning up"
 log_run apt-get autoremove -y
@@ -587,7 +625,7 @@ log_run apt-get clean
 rm -rf /var/lib/apt/lists/*
 msg_ok "Cleaned up"
 
-# ─── 17. MOTD ─────────────────────────────────────────────────────────────────────
+# ─── 18. MOTD ─────────────────────────────────────────────────────────────────────
 
 msg_info "Writing login banner"
 SERVER_IP=$(hostname -I | awk '{print $1}')

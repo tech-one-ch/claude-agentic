@@ -54,7 +54,9 @@ fi
 if command -v code-server &>/dev/null; then
   msg_info "Updating code-server"
   curl -fsSL https://code-server.dev/install.sh | sh
-  systemctl restart code-server@root 2>/dev/null || true
+  _cs_svc=$(systemctl list-unit-files 'code-server@*.service' --no-legend 2>/dev/null \
+    | awk '$2 ~ /enabled/ {gsub(/\.service$/, "", $1); print $1; exit}')
+  [[ -n "$_cs_svc" ]] && systemctl restart "$_cs_svc" 2>/dev/null || true
   msg_ok "code-server updated"
 fi
 
