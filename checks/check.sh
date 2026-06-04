@@ -298,15 +298,16 @@ run_checks() {
   # 4. Claude Code
   echo -e "  ${BOLD}Claude Code${CL}"
   check_cmd  "claude"         "claude" "claude --version"
-  check_path "settings.json" "/root/.claude/settings.json"
+  check_path "settings.json" "$HOME/.claude/settings.json"
   check_path "workspace"     "/project"
   check_path "CLAUDE.md"     "/project/CLAUDE.md"
   flush; echo ""
 
   # 5. Web IDE
   echo -e "  ${BOLD}Web IDE${CL}"
-  check_cmd     "code-server"       "code-server" "code-server --version"
-  check_service "code-server@root"  "code-server@root"
+  local _cs_user="${SUDO_USER:-$(id -un)}"
+  check_cmd     "code-server"              "code-server" "code-server --version"
+  check_service "code-server@${_cs_user}" "code-server@${_cs_user}"
   if command -v code &>/dev/null; then
     check_cmd "VS Code Tunnel CLI" "code" "code --version"
   else

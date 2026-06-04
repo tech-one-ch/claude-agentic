@@ -12,13 +12,13 @@
 # ─── Mode detection & logging ──────────────────────────────────────────────────
 
 LOG_FILE="/var/log/claude-agentic-install.log"
-mkdir -p "$(dirname "$LOG_FILE")"
 
 if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   # community-scripts mode:
   # - commands run normally, output goes to stdout (captured by build.func)
   # - log_run is a transparent pass-through — no redirection, no interference
   log_run() { "$@"; }
+  mkdir -p "$(dirname "$LOG_FILE")"
   echo "=== Install started: $(date) ===" >> "$LOG_FILE"
   source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
   color
@@ -28,7 +28,10 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   network_check
   update_os
 else
-  # standalone mode: tee to both stdout and log file
+  # standalone mode — escalate first, before any operation that needs root
+  [[ $EUID -ne 0 ]] && exec sudo "$0" "$@"
+
+  mkdir -p "$(dirname "$LOG_FILE")"
   echo "=== Install started: $(date) ===" >> "$LOG_FILE"
   exec > >(tee -a "$LOG_FILE") 2>&1
   # log_run redirects output to log file only (screen stays clean)
@@ -49,8 +52,6 @@ else
   msg_ok()    { local m="$1"; echo -e "${BFR} ${CM} ${GN}${m}${CL}"; }
   msg_error() { local m="$1"; echo -e "${BFR} ${CROSS} ${RD}${m}${CL}"; exit 1; }
   msg_warn()  { local m="$1"; echo -e " ${INFO} ${YW}${m}${CL}"; }
-
-  [[ $EUID -ne 0 ]] && exec sudo "$0" "$@"
   [[ ! -f /etc/os-release ]] && msg_error "Cannot detect OS"
   source /etc/os-release
   [[ "$ID" != "debian" && "$ID" != "ubuntu" ]] && msg_error "Requires Debian or Ubuntu (got: ${ID})"
@@ -236,6 +237,8 @@ rm -f /tmp/_rustup_init.sh
 source "$REAL_HOME/.cargo/env" 2>/dev/null || export PATH="$REAL_HOME/.cargo/bin:$PATH"
 [[ ! -f /usr/local/bin/cargo ]] && ln -sf "$REAL_HOME/.cargo/bin/cargo" /usr/local/bin/cargo 2>/dev/null || true
 [[ ! -f /usr/local/bin/rustc ]] && ln -sf "$REAL_HOME/.cargo/bin/rustc" /usr/local/bin/rustc 2>/dev/null || true
+ln -sf /usr/local/bin/cargo /usr/bin/cargo 2>/dev/null || true
+ln -sf /usr/local/bin/rustc /usr/bin/rustc 2>/dev/null || true
 msg_ok "Installed Rust $(rustc --version 2>/dev/null | cut -d' ' -f2 || echo 'latest')"
 
 # ─── 7. Docker + Compose plugin ───────────────────────────────────────────────────
