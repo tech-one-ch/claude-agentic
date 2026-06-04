@@ -392,7 +392,20 @@ cat > "$REAL_HOME/.claude/settings.json" <<'EOF'
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "extraKnownMarketplaces": {
+    "superpowers-marketplace": {
+      "source": { "source": "github", "repo": "obra/superpowers-marketplace" }
+    }
+  },
+  "enabledPlugins": {
+    "code-review@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "superpowers@superpowers-marketplace": true
+  }
 }
 EOF
 msg_ok "Configured Claude Code (all permissions pre-approved)"
@@ -402,11 +415,11 @@ msg_ok "Configured Claude Code (all permissions pre-approved)"
 # Enables remote control auto-start (requires Pro/Max account, not API key)
 if [[ -f "$REAL_HOME/.claude.json" ]] && command -v jq &>/dev/null; then
   _tmp_cj=$(mktemp)
-  jq '. + {"autoStartRemoteControl": true}' "$REAL_HOME/.claude.json" \
+  jq '. + {"remoteControlAtStartup": true}' "$REAL_HOME/.claude.json" \
     > "$_tmp_cj" && mv "$_tmp_cj" "$REAL_HOME/.claude.json" \
     || rm -f "$_tmp_cj"
 else
-  echo '{"autoStartRemoteControl": true}' > "$REAL_HOME/.claude.json"
+  echo '{"remoteControlAtStartup": true}' > "$REAL_HOME/.claude.json"
 fi
 [[ "$REAL_USER" != "root" ]] && chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.claude.json"
 msg_ok "Remote control auto-start configured (~/.claude.json)"
@@ -458,20 +471,24 @@ Requires Pro/Max account login (not API key).
 - Compose files: `/docker/<service>/docker-compose.yml`
 - All containers need `security_opt: [apparmor=unconfined]` in this LXC
 
-## Plugins (install inside Claude Code)
+## Plugins
 
-### Official marketplace
-```
-/plugin install code-review@claude-plugins-official
-/plugin install commit-commands@claude-plugins-official
-/plugin install security-guidance@claude-plugins-official
-```
+The following plugins are pre-configured and auto-install on first Claude launch:
 
-### Superpowers — structured development methodology (third-party)
-Enforces: brainstorm → design → plan → implement (subagents) → TDD → review
+**Official marketplace:**
+- `code-review` — structured code review workflow
+- `commit-commands` — standardized commit message helpers
+- `security-guidance` — security best-practice guidance
+- `context7` — up-to-date library documentation lookup
+- `frontend-design` — UI/UX design patterns and guidance
+
+**Third-party (obra/superpowers-marketplace):**
+- `superpowers` — full development methodology: brainstorm → design →
+  plan → implement (subagents) → TDD → review
+
+To install additional plugins manually:
 ```
-/plugin marketplace add obra/superpowers-marketplace
-/plugin install superpowers@superpowers-marketplace
+/plugin install <name>@claude-plugins-official
 ```
 EOF
 msg_ok "Workspace ready at /projects"
