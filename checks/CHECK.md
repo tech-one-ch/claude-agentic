@@ -8,13 +8,13 @@ Run it inside the LXC or VM after installation.
 ## Run from `main` (stable)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh)
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash
 ```
 
 ## Run from `dev` (testing)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh)
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/dev/checks/check.sh | bash
 ```
 
 ---
@@ -33,20 +33,20 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/d
 
 ```bash
 # Export to auto-named file
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --export
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash -s -- --export
 
 # Export to specific file
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --export /tmp/results.txt
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash -s -- --export /tmp/results.txt
 
 # Send to Supabase (interactive prompt)
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --supabase
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash -s -- --supabase
 
 # Send to Supabase with URL pre-filled (key prompted)
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash \
   --supabase-url https://abc123.supabase.co
 
 # Export + Supabase
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash \
   --export --supabase
 ```
 
@@ -65,24 +65,24 @@ The script resolves credentials in this order:
 
 **Option A — interactive prompt** (recommended, key never visible):
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --supabase
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash -s -- --supabase
 ```
 
 **Option B — environment variables** (for automation):
 ```bash
 export SUPABASE_URL="https://abc123.supabase.co"
 export SUPABASE_KEY="your-publishable-or-anon-key"
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) --supabase
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash -s -- --supabase
 ```
 
 **Option C — CLI flags** (URL only recommended, key via flag is visible in bash history):
 ```bash
 # URL only — key will be prompted (hidden)
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash \
   --supabase-url https://abc123.supabase.co
 
 # URL + key — convenient but key appears in bash history ⚠️
-bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh) \
+curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/checks/check.sh | bash \
   --supabase-url https://abc123.supabase.co \
   --supabase-key your-anon-key
 ```
