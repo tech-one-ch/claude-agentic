@@ -29,7 +29,15 @@ if [[ -n "$FUNCTIONS_FILE_PATH" ]]; then
   update_os
 else
   # standalone mode — escalate first, before any operation that needs root
-  [[ $EUID -ne 0 ]] && exec sudo "$0" "$@"
+  if [[ $EUID -ne 0 ]]; then
+    if [[ -f "$0" ]]; then
+      exec sudo bash "$0" "$@"
+    fi
+    # Pipe invocation (bash <(curl ...) or curl | bash): $0 is not a real file,
+    # so we cannot re-exec. Tell the user to add sudo explicitly.
+    echo -e "\nRun with sudo:\n  sudo bash <(curl -fsSL https://raw.githubusercontent.com/tech-one-ch/claude-agentic/main/install/claude-agentic-install.sh)\n" >&2
+    exit 1
+  fi
 
   mkdir -p "$(dirname "$LOG_FILE")"
   echo "=== Install started: $(date) ===" >> "$LOG_FILE"
